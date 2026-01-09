@@ -1,0 +1,69 @@
+<Solution>
+  <PropertyGroup Name="lobby" Version="3.10.0.0" Type="CocosStudio" />
+  <SolutionFolder>
+    <Group ctype="ResourceGroup">
+      <RootFolder Name=".">
+        <Folder Name="global">
+          <Folder Name="fonts">
+            <TTF Name="montserrat_bold.ttf" />
+            <TTF Name="neon_arcade_common.ttf" />
+          </Folder>
+          <Folder Name="imgs">
+            <Image Name="bg_common_dialog.png" />
+            <Image Name="bg_loading.png" />
+          </Folder>
+          <Folder Name="plist">
+            <Folder Name="general">
+              <Image Name="img_line.png" />
+              <Image Name="img_loading.png" />
+              <Image Name="img_lock.png" />
+              <Image Name="img_lock_small_bg.png" />
+              <Image Name="img_tag_select.png" />
+              <Image Name="indicator_bg.png" />
+              <Image Name="indicator_home_bg.png" />
+              <Image Name="indicator_home_img.png" />
+              <Image Name="indicator_img.png" />
+              <Image Name="msg_bg_left.png" />
+              <Image Name="msg_bg_right.png" />
+              <Image Name="red_dot.png" />
+              <Image Name="red_dot_big.png" />
+              <Image Name="ui_toast_bg.png" />
+              <Image Name="white_dot.png" />
+              <Image Name="xiala.png" />
+            </Folder>
+          </Folder>
+          <PlistInfo Name="global.csi" Type="Plist" />
+        </Folder>
+        <Folder Name="lang">
+          <Folder Name="font">
+            <Folder Name="cn">
+              <TTF Name="cn_neon_arcade.ttf" />
+            </Folder>
+          </Folder>
+          <Folder Name="plist">
+            <Folder Name="cn" />
+          </Folder>
+          <PlistInfo Name="cn.csi" Type="Plist" />
+        </Folder>
+        <Folder Name="ui">
+          <Folder Name="common">
+            <Folder Name="plist">
+              <Image Name="jdt_1.png" />
+              <Image Name="jdt_2.png" />
+              <Image Name="qx.png" />
+              <Image Name="tijiao.png" />
+            </Folder>
+            <PlistInfo Name="common.csi" Type="Plist" />
+            <Project Name="LoadingLayer.csd" Type="Layer" />
+            <Project Name="MaskCircle.csd" Type="Layer" />
+            <Project Name="MessageBox.csd" Type="Node" />
+            <Project Name="Toast.csd" Type="Node" />
+          </Folder>
+        </Folder>
+        <Folder Name="views">
+          <Project Name="LaunchView.csd" Type="Layer" />
+        </Folder>
+      </RootFolder>
+    </Group>
+  </SolutionFolder>
+</Solution>

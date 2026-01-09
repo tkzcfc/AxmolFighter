@@ -1,0 +1,13 @@
+<PlistInfoProjectFile>
+  <PropertyGroup Name="plist" Type="Plist" ID="1d117f98-b4ae-4636-8b27-ff3d265e9d21" Version="3.10.0.0" />
+  <Content ExportType="Png" SortAlgorithm="MaxRects" PicturePadding="1" AllowRotation="False" AllowAnySize="True" AllowTrim="True" ctype="PlistInfoData">
+    <ImageFiles>
+      <FilePathData Path="boot/resource/plist/but_huang.png" />
+      <FilePathData Path="boot/resource/plist/but_lv.png" />
+      <FilePathData Path="boot/resource/plist/jdt_1.png" />
+      <FilePathData Path="boot/resource/plist/jdt_2.png" />
+      <FilePathData Path="boot/resource/plist/ts_dk.png" />
+    </ImageFiles>
+    <MaxSize Width="1024" Height="1024" />
+  </Content>
+</PlistInfoProjectFile>

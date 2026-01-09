@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>frames</key>
+		<dict>
+			<key>boot/resource/plist/but_huang.png</key>
+			<dict>
+				<key>frame</key>
+				<string>{{575,1},{186,66}}</string>
+				<key>offset</key>
+				<string>{0,0}</string>
+				<key>rotated</key>
+				<false />
+				<key>sourceSize</key>
+				<string>{186,66}</string>
+			</dict>
+			<key>boot/resource/plist/but_lv.png</key>
+			<dict>
+				<key>frame</key>
+				<string>{{763,1},{186,66}}</string>
+				<key>offset</key>
+				<string>{0,0}</string>
+				<key>rotated</key>
+				<false />
+				<key>sourceSize</key>
+				<string>{186,66}</string>
+			</dict>
+			<key>boot/resource/plist/jdt_1.png</key>
+			<dict>
+				<key>frame</key>
+				<string>{{1,374},{659,92}}</string>
+				<key>offset</key>
+				<string>{0,0}</string>
+				<key>rotated</key>
+				<false />
+				<key>sourceSize</key>
+				<string>{659,92}</string>
+			</dict>
+			<key>boot/resource/plist/jdt_2.png</key>
+			<dict>
+				<key>frame</key>
+				<string>{{1,468},{625,56}}</string>
+				<key>offset</key>
+				<string>{0,0}</string>
+				<key>rotated</key>
+				<false />
+				<key>sourceSize</key>
+				<string>{625,56}</string>
+			</dict>
+			<key>boot/resource/plist/ts_dk.png</key>
+			<dict>
+				<key>frame</key>
+				<string>{{1,1},{572,371}}</string>
+				<key>offset</key>
+				<string>{0,0}</string>
+				<key>rotated</key>
+				<false />
+				<key>sourceSize</key>
+				<string>{572,371}</string>
+			</dict>
+		</dict>
+		<key>metadata</key>
+		<dict>
+			<key>format</key>
+			<integer>2</integer>
+			<key>textureFileName</key>
+			<string>plist.png</string>
+			<key>realTextureFileName</key>
+			<string>plist.png</string>
+			<key>size</key>
+			<string>{950,525}</string>
+		</dict>
+		<key>texture</key>
+		<dict>
+			<key>width</key>
+			<integer>950</integer>
+			<key>height</key>
+			<integer>525</integer>
+		</dict>
+	</dict>
+</plist>

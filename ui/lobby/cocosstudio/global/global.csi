@@ -1,0 +1,24 @@
+<PlistInfoProjectFile>
+  <PropertyGroup Name="global" Type="Plist" ID="d3185d25-7347-44d6-9295-ff693eed1485" Version="3.10.0.0" />
+  <Content ExportType="Png" SortAlgorithm="MaxRects" PicturePadding="1" AllowRotation="True" AllowAnySize="True" AllowTrim="False" ctype="PlistInfoData">
+    <ImageFiles>
+      <FilePathData Path="global/plist/general/ui_toast_bg.png" />
+      <FilePathData Path="global/plist/general/white_dot.png" />
+      <FilePathData Path="global/plist/general/indicator_bg.png" />
+      <FilePathData Path="global/plist/general/indicator_img.png" />
+      <FilePathData Path="global/plist/general/red_dot_big.png" />
+      <FilePathData Path="global/plist/general/xiala.png" />
+      <FilePathData Path="global/plist/general/img_loading.png" />
+      <FilePathData Path="global/plist/general/msg_bg_left.png" />
+      <FilePathData Path="global/plist/general/msg_bg_right.png" />
+      <FilePathData Path="global/plist/general/indicator_home_bg.png" />
+      <FilePathData Path="global/plist/general/indicator_home_img.png" />
+      <FilePathData Path="global/plist/general/img_tag_select.png" />
+      <FilePathData Path="global/plist/general/img_line.png" />
+      <FilePathData Path="global/plist/general/img_lock.png" />
+      <FilePathData Path="global/plist/general/img_lock_small_bg.png" />
+      <FilePathData Path="global/plist/general/red_dot.png" />
+    </ImageFiles>
+    <MaxSize Width="2048" Height="2048" />
+  </Content>
+</PlistInfoProjectFile>

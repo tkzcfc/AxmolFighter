@@ -24,14 +24,14 @@
  ****************************************************************************/
 
 #include "AppDelegate.h"
-#include "lua-bindings/manual/LuaEngine.h"
-#include "lua-bindings/manual/lua_module_register.h"
 
 #define USE_AUDIO_ENGINE 1
 
 #if USE_AUDIO_ENGINE
 #    include "audio/AudioEngine.h"
 #endif
+
+#include "entry.h"
 
 using namespace ax;
 using namespace std;
@@ -52,29 +52,14 @@ void AppDelegate::initGfxContextAttrs()
 
 bool AppDelegate::applicationDidFinishLaunching()
 {
-    // set default FPS
-    Director::getInstance()->setAnimationInterval(1.0 / 60.0f);
+#ifdef AX_PLATFORM_PC
+    // Enable logging output colored text style and prefix timestamp
+    ax::setLogFmtFlag(ax::LogFmtFlag::Full);
+#endif
+    // whether enable global SDF font render support, since axmol-2.0.1
+    // FontFreeType::setShareDistanceFieldEnabled(true);
 
-    // register lua module
-    auto engine = LuaEngine::getInstance();
-    ScriptEngineManager::getInstance()->setScriptEngine(engine);
-    lua_State* L = engine->getLuaStack()->getLuaState();
-    lua_module_register(L);
-
-    LuaStack* stack = engine->getLuaStack();
-
-    // register custom function
-    // LuaStack* stack = engine->getLuaStack();
-    // register_custom_function(stack->getLuaState());
-
-    stack->addSearchPath("src");
-    FileUtils::getInstance()->addSearchPath("res");
-    if (engine->executeString("require 'main'"))
-    {
-        return false;
-    }
-
-    return true;
+    return app_start();
 }
 
 // This function will be called when the app is inactive. Note, when receiving a phone call it is invoked.
@@ -85,6 +70,7 @@ void AppDelegate::applicationDidEnterBackground()
 #if USE_AUDIO_ENGINE
     AudioEngine::pauseAll();
 #endif
+    Director::getInstance()->getEventDispatcher()->dispatchCustomEvent("APP_ENTER_BACKGROUND_EVENT");
 }
 
 // this function will be called when the app is active again
@@ -95,6 +81,24 @@ void AppDelegate::applicationWillEnterForeground()
 #if USE_AUDIO_ENGINE
     AudioEngine::resumeAll();
 #endif
+    Director::getInstance()->getEventDispatcher()->dispatchCustomEvent("APP_ENTER_FOREGROUND_EVENT");
 }
 
 void AppDelegate::applicationWillQuit() {}
+
+void AppDelegate::applicationRestartStart()
+{
+    app_restart_start();
+}
+
+void AppDelegate::applicationRestartFinish()
+{
+    app_restart_finish();
+}
+
+#if AX_TARGET_PLATFORM == AX_PLATFORM_IOS
+void AppDelegate::applicationScreenSizeChanged(int newWidth, int newHeight)
+{
+    app_screen_size_changed(newWidth, newHeight);
+}
+#endif

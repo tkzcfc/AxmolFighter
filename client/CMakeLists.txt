@@ -27,6 +27,19 @@ cmake_minimum_required(VERSION 3.22...4.1)
 
 set(APP_NAME client)
 
+##########################################################################################################
+##########################################################################################################
+##########################################################################################################
+
+set(AX_USE_LUAJIT false)
+add_definitions(-DAX_NO_DUP_SEARCH_PATH)
+add_definitions(-DXX_DISABLE_APPEND)
+add_definitions(-DLUA_FLOORN2I=F2Ifloor)
+
+##########################################################################################################
+##########################################################################################################
+##########################################################################################################
+
 project(${APP_NAME})
 
 if(XCODE)
@@ -40,6 +53,23 @@ set(CMAKE_MODULE_PATH
 # Important when BUILD_SHARED_LIBS option is set to TRUE
 set(_AX_LUA_PROJ TRUE)
 set(_AX_USE_PREBUILT FALSE)
+
+
+##########################################################################################################
+##########################################################################################################
+##########################################################################################################
+
+# Extension
+set(AX_ENABLE_EXT_WEBM ON CACHE BOOL "Build extension webm" FORCE)
+set(AX_ENABLE_EXT_MPEGPLAYER ON CACHE BOOL "Build extension MPEGPlayer" FORCE)
+set(AX_ENABLE_EXT_INSPECTOR OFF CACHE BOOL "Enable extension Inspector" FORCE)
+set(AX_ENABLE_EXT_DRAGONBONES OFF CACHE BOOL "Build extension DragonBones" FORCE)
+set(AX_ENABLE_NAVMESH OFF CACHE BOOL "Build NavMesh support" FORCE)
+#set(AX_ENABLE_WEBSOCKET OFF CACHE BOOL "Build Websocket client based on yasio" FORCE)
+
+##########################################################################################################
+##########################################################################################################
+##########################################################################################################
 
 # NOTE: The order of the cmake module "include(AXGame...)" statements matters
 include(AXGameEngineOptions)
@@ -61,6 +91,7 @@ set(content_folder "${CMAKE_CURRENT_SOURCE_DIR}/Content")
 set(engine_script_folder "${_AX_ROOT}/extensions/scripting/lua-bindings/script")
 
 if(APPLE)
+  set(content_folder "${CMAKE_CURRENT_SOURCE_DIR}/Content_IOS")
   ax_mark_multi_resources(content_files RES_TO "Resources" FOLDERS ${content_folder})
   set(common_content_files ${content_files})
 elseif(WINDOWS)

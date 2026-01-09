@@ -21,10 +21,11 @@ https://axmol.dev/
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-#import <UIKit/UIKit.h>
 #include "AppDelegate.h"
+#import <UIKit/UIKit.h>
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[])
+{
     AppDelegate app;
     @autoreleasepool {
         return UIApplicationMain(argc, argv, nil, @"GameAppController");

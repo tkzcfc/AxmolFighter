@@ -1,0 +1,29 @@
+<Solution>
+  <PropertyGroup Name="boot" Version="3.10.0.0" Type="CocosStudio" />
+  <SolutionFolder>
+    <Group ctype="ResourceGroup">
+      <RootFolder Name=".">
+        <Folder Name="boot">
+          <Folder Name="resource">
+            <Folder Name="fonts">
+              <TTF Name="montserrat_bold.ttf" />
+            </Folder>
+            <Folder Name="imgs">
+              <Image Name="bg.jpg" />
+            </Folder>
+            <Folder Name="plist">
+              <Image Name="but_huang.png" />
+              <Image Name="but_lv.png" />
+              <Image Name="jdt_1.png" />
+              <Image Name="jdt_2.png" />
+              <Image Name="ts_dk.png" />
+            </Folder>
+            <Project Name="LoadingLayer.csd" Type="Layer" />
+            <Project Name="MsgBoxLayer.csd" Type="Layer" />
+            <PlistInfo Name="plist.csi" Type="Plist" />
+          </Folder>
+        </Folder>
+      </RootFolder>
+    </Group>
+  </SolutionFolder>
+</Solution>

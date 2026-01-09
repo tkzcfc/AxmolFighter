@@ -1,0 +1,20 @@
+
+h5_loading.png
+size: 254,254
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+imagine/heiquan
+  rotate: true
+  xy: 2, 2
+  size: 108, 109
+  orig: 128, 128
+  offset: 10, 10
+  index: -1
+imagine/jiazai
+  rotate: false
+  xy: 2, 112
+  size: 140, 140
+  orig: 152, 152
+  offset: 6, 6
+  index: -1

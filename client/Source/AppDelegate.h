@@ -58,8 +58,15 @@ public:
     void applicationWillEnterForeground() override;
 
     /**
-	@brief Called when application will quit
+    @brief Called when application will quit
     @since axmol-2.10.0
-	*/
+    */
     void applicationWillQuit() override;
+
+#if AX_TARGET_PLATFORM == AX_PLATFORM_IOS
+    void applicationScreenSizeChanged(int newWidth, int newHeight) override;
+#endif
+    void applicationRestartStart() override;
+
+    void applicationRestartFinish() override;
 };

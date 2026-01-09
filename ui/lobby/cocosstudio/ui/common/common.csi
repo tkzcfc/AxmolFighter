@@ -1,0 +1,12 @@
+<PlistInfoProjectFile>
+  <PropertyGroup Name="common" Type="Plist" ID="de3e81b8-50f1-412d-b433-d19bbda53a69" Version="3.10.0.0" />
+  <Content ExportType="Png" SortAlgorithm="MaxRects" PicturePadding="0" AllowRotation="True" AllowAnySize="True" AllowTrim="False" ctype="PlistInfoData">
+    <ImageFiles>
+      <FilePathData Path="ui/common/plist/jdt_1.png" />
+      <FilePathData Path="ui/common/plist/jdt_2.png" />
+      <FilePathData Path="ui/common/plist/qx.png" />
+      <FilePathData Path="ui/common/plist/tijiao.png" />
+    </ImageFiles>
+    <MaxSize Width="1024" Height="1024" />
+  </Content>
+</PlistInfoProjectFile>
