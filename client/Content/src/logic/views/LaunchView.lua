@@ -5,6 +5,13 @@ function LaunchView:ctor()
 
     self:loadUI("views/LaunchView", self)
     
+    self:runAction(cc.CallFunc:create(function()
+        self:initUI()
+    end))
+end
+
+function LaunchView:initUI()
+
     local world = af.GameWord.new()
     world:init()
 
@@ -18,7 +25,7 @@ function LaunchView:ctor()
     player1:addComponent("Component_AI")
 
     player2:addComponent("Component_Render")
-    player2:addComponent("Component_AI")
+     player2:addComponent("Component_AI")
     ecsManager:addSystem("RenderSystem")
 
     print("---------------------------------------------------[1]")
@@ -41,6 +48,8 @@ function LaunchView:ctor()
     collectgarbage("collect")
     collectgarbage("collect")
     collectgarbage("collect")
+
+    -- player1:addComponent("Component_Render")
 end
 
 return LaunchView

@@ -1,11 +1,7 @@
 #pragma once
 
-#include <stdint.h>
+#include "af/Object.h"
 #include <bitset>
-#include <string>
-#include <assert.h>
-#include <vector>
-#include <unordered_map>
 
 namespace af
 {

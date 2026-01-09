@@ -4,7 +4,7 @@
 
 namespace af
 {
-class Component
+class Component : public Object
 {
 public:
     Component();

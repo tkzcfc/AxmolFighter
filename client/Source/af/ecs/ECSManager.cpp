@@ -137,7 +137,8 @@ const std::string& ECSManager::getComponentName(ComponentTypeId typeId) const
         }
     }
     assert(false && "Component type ID not registered.");
-    return "Unknown Component";
+    static const std::string unknown = "Unknown Component";
+    return unknown;
 }
 
 Component* ECSManager::addComponent(Entity* entity, const std::string& name)

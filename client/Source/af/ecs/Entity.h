@@ -6,12 +6,12 @@
 namespace af
 {
 class ECSManager;
-class Entity final
+class Entity : public Object
 {
 public:
     Entity();
 
-    ~Entity();
+    virtual ~Entity();
 
     EntityId getId() const;
 

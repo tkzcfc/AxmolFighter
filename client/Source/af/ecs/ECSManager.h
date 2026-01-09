@@ -13,12 +13,12 @@ class ECSManager;
 using ComponentCreateFuncType = std::function<Component*()>;
 using SystemCreateFuncType    = std::function<System*(ECSManager*)>;
 
-class ECSManager final
+class ECSManager : public Object
 {
 public:
     ECSManager();
 
-    ~ECSManager();
+    virtual ~ECSManager();
 
 public:
     Entity* newEntity();

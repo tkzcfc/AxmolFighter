@@ -10,20 +10,20 @@ void register_ecs_tolua(sol::table& af)
     // Entity
     af.new_usertype<Entity>(
         "Entity", sol::no_constructor,
-        "getId", &Entity::getId,
-        "addComponent", &Entity::addComponent,
-        "removeComponent", &Entity::removeComponent,
-        "containsComponent", &Entity::containsComponent,
-        "containsComponentByTypeId", &Entity::containsComponentByTypeId,
-        "getComponent", &Entity::getComponent,
-        "getComponentByTypeId", &Entity::getComponentByTypeId,
-        "isPendingRemoval", &Entity::isPendingRemoval,
-        "destroy", &Entity::destroy);
+        LUA_METHOD_0(Entity, getId),
+        LUA_METHOD_1(Entity, addComponent, const std::string&),
+        LUA_METHOD_1(Entity, removeComponent, const std::string&),
+        LUA_METHOD_1(Entity, containsComponent, const std::string&),
+        LUA_METHOD_1(Entity, containsComponentByTypeId, ComponentTypeId),
+        LUA_METHOD_1(Entity, getComponent, const std::string&),
+        LUA_METHOD_1(Entity, getComponentByTypeId, ComponentTypeId),
+        LUA_METHOD_0(Entity, isPendingRemoval),
+        LUA_METHOD_0(Entity, destroy));
 
     // System
     af.new_usertype<System>(
         "System", sol::no_constructor,
-        "addRequiredComponent", &System::addRequiredComponent);
+        LUA_METHOD_1(System, addRequiredComponent, ComponentTypeId));
 
     // Component
     af.new_usertype<Component>(
@@ -32,15 +32,16 @@ void register_ecs_tolua(sol::table& af)
     // ECSManager
     af.new_usertype<ECSManager>(
         "ECSManager", sol::no_constructor,
-        "newEntity", &ECSManager::newEntity,
-        "getEntity", &ECSManager::getEntity,
-        "destroyEntityById", &ECSManager::destroyEntityById,
-        "destroyEntity", &ECSManager::destroyEntity,
-        "addSystem", &ECSManager::addSystem,
-        "getComponentType", &ECSManager::getComponentType,
-        "addComponent", &ECSManager::addComponent,
-        "removeComponent", &ECSManager::removeComponent,
-        "update", &ECSManager::update);
+        LUA_METHOD_0(ECSManager, newEntity),
+        LUA_METHOD_1(ECSManager, getEntity, EntityId),
+        LUA_METHOD_1(ECSManager, destroyEntityById, EntityId),
+        LUA_METHOD_1(ECSManager, destroyEntity, Entity*),
+        LUA_METHOD_1(ECSManager, addSystem, const std::string&),
+        LUA_METHOD_1(ECSManager, getComponentType, const std::string&),
+        LUA_METHOD_1(ECSManager, getComponentName, ComponentTypeId),
+        LUA_METHOD_2(ECSManager, addComponent, Entity*, const std::string&),
+        LUA_METHOD_2(ECSManager, removeComponent, Entity*, const std::string&),
+        LUA_METHOD_1(ECSManager, update, float));
 
     // clang-format on
 }

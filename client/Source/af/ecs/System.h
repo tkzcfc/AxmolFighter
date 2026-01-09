@@ -5,7 +5,7 @@
 
 namespace af
 {
-class System
+class System : public Object
 {
 public:
     System();
