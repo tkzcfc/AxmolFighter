@@ -5,7 +5,6 @@ namespace af
 
 Component::Component()
 {
-
     AF_ECS_LOG("[%p] new Component\n", this);
 }
 Component::~Component()

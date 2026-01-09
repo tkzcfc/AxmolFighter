@@ -18,24 +18,3 @@ display.runScene(scene)
 require("boot.src.utils"):init(scene)
 
 scene:addChild(require("boot.src.layer.UpdateLayer").new())
-
--- local world = af.GameWord.new()
--- world:init()
-
--- for i = 1, 5 do
---     world:update(0)
--- end
-
--- world = nil
-
--- collectgarbage("collect")
--- collectgarbage("collect")
--- collectgarbage("collect")
--- collectgarbage("collect")
--- collectgarbage("collect")
-
-
--- -- local sharedScheduler = ax.Director:getInstance():getScheduler()
--- -- sharedScheduler:scheduleScriptFunc(function(dt)
--- --     world:update(dt)
--- -- end, 0, false)
