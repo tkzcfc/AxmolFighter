@@ -4,19 +4,20 @@ namespace af
 {
 System::System()
 {
-    AF_ECS_LOG("[%p] new System\n", this);
+    AF_ECS_OBJECT_GC_LOG("[%p] new System\n", this);
 }
 
 System::~System()
 {
-    AF_ECS_LOG("[%p] System delete\n", this);
+    assert(m_entities.empty() && "System entities not fully removed.");
+    AF_ECS_OBJECT_GC_LOG("[%p] System delete\n", this);
 }
 
 void System::update(float dt) {}
 
 bool System::filtersMatch(const Signature& entitySignature) const
 {
-    return (entitySignature & m_signature) == m_signature;
+    return !m_signature.none() && !entitySignature.none() && ((entitySignature & m_signature) == m_signature);
 }
 
 bool System::containsComponentType(ComponentTypeId typeId) const
@@ -34,21 +35,23 @@ void System::addRequiredComponent(ComponentTypeId typeId)
     m_signature.set(static_cast<size_t>(typeId));
 }
 
+std::string System::getName() const
+{
+    return m_name;
+}
+
 void System::addEntity(Entity* entity)
 {
-#if _DEBUG
     for (auto* it : m_entities)
     {
         if (it == entity)
         {
-            assert(false && "Entity already exists in the system.");
             return;
         }
     }
-#endif
     m_entities.push_back(entity);
     onEntityAdded(entity);
-    AF_ECS_LOG("[%p] onEntityAdded %p\n", this, entity);
+    AF_ECS_LOG("[ECS] %s onEntityAdded [%u]\n", m_name.c_str(), entity->getId());
 }
 
 void System::removeEntity(Entity* entity)
@@ -57,7 +60,7 @@ void System::removeEntity(Entity* entity)
     {
         if (*it == entity)
         {
-            AF_ECS_LOG("[%p] onEntityRemoved %p\n", this, entity);
+            AF_ECS_LOG("[ECS] %s onEntityRemoved [%u]\n", m_name.c_str(), entity->getId());
             onEntityRemoved(entity);
             m_entities.erase(it);
             break;

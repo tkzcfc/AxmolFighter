@@ -22,6 +22,8 @@ public:
 
     void addRequiredComponent(ComponentTypeId typeId);
 
+    std::string getName() const;
+
 private:
     virtual void onEntityAdded(Entity* entity) {}
 
@@ -36,6 +38,7 @@ private:
     friend class ECSManager;
     Signature m_signature;
     std::vector<Entity*> m_entities;
+    std::string m_name;
 };
 
 }  // namespace af

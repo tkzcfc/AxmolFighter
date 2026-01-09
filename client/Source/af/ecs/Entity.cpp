@@ -6,16 +6,23 @@ namespace af
 
 Entity::Entity() : m_pendingRemoval(false), m_id(INVALID_ENTITY_ID), m_ecsManager(nullptr)
 {
-    AF_ECS_LOG("[%p] new Entity\n", this);
+    AF_ECS_OBJECT_GC_LOG("[%p] new Entity\n", this);
     m_components.reserve(10);
 }
 Entity::~Entity()
 {
+    std::vector<std::string> componentNames;
+    componentNames.reserve(m_components.size());
     for (auto* it : m_components)
     {
-        delete it;
+        componentNames.push_back(m_ecsManager->getComponentName(it->getTypeId()));
     }
-    AF_ECS_LOG("[%p] delete Entity\n", this);
+    for (const auto& name : componentNames)
+    {
+        m_ecsManager->removeComponent(this, name);
+    }
+    assert(m_components.empty() && "Entity components not fully removed.");
+    AF_ECS_OBJECT_GC_LOG("[%p] delete Entity\n", this);
 }
 
 EntityId Entity::getId() const
@@ -23,9 +30,9 @@ EntityId Entity::getId() const
     return m_id;
 }
 
-void Entity::addComponent(const std::string& name, Component* component)
+Component* Entity::addComponent(const std::string& name)
 {
-    m_ecsManager->addComponent(this, name, component);
+    return m_ecsManager->addComponent(this, name);
 }
 
 void Entity::removeComponent(const std::string& name)

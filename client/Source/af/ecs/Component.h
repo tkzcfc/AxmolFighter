@@ -11,6 +11,8 @@ public:
 
     virtual ~Component();
 
+    ComponentTypeId getTypeId();
+
 private:
     friend class ECSManager;
     friend class Entity;

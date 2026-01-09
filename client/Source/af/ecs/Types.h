@@ -26,3 +26,11 @@ using Signature               = std::bitset<MAX_SIGNATURES>;
 #else
 #    define AF_ECS_LOG(...)
 #endif
+
+#define AF_ECS_OBJECT_GC_LOG_ENABLED 0
+
+#if AF_ECS_OBJECT_GC_LOG_ENABLED
+#    define AF_ECS_OBJECT_GC_LOG(...) printf(__VA_ARGS__)
+#else
+#    define AF_ECS_OBJECT_GC_LOG(...)
+#endif

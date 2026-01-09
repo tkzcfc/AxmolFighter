@@ -9,7 +9,7 @@ void register_ecs_tolua(sol::table& af)
 
     // Entity
     af.new_usertype<Entity>(
-        "Entity", sol::constructors<Entity()>(),
+        "Entity", sol::no_constructor,
         "getId", &Entity::getId,
         "addComponent", &Entity::addComponent,
         "removeComponent", &Entity::removeComponent,
@@ -22,22 +22,21 @@ void register_ecs_tolua(sol::table& af)
 
     // System
     af.new_usertype<System>(
-        "System", sol::constructors<System()>(),
+        "System", sol::no_constructor,
         "addRequiredComponent", &System::addRequiredComponent);
 
     // Component
     af.new_usertype<Component>(
-        "Component", sol::constructors<Component()>());
+        "Component", sol::no_constructor);
 
     // ECSManager
     af.new_usertype<ECSManager>(
-        "ECSManager", sol::constructors<ECSManager()>(),
+        "ECSManager", sol::no_constructor,
         "newEntity", &ECSManager::newEntity,
         "getEntity", &ECSManager::getEntity,
         "destroyEntityById", &ECSManager::destroyEntityById,
         "destroyEntity", &ECSManager::destroyEntity,
         "addSystem", &ECSManager::addSystem,
-        "registerComponentType", &ECSManager::registerComponentType,
         "getComponentType", &ECSManager::getComponentType,
         "addComponent", &ECSManager::addComponent,
         "removeComponent", &ECSManager::removeComponent,

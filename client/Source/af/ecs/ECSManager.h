@@ -4,9 +4,15 @@
 #include "Entity.h"
 #include "System.h"
 #include "Component.h"
+#include <functional>
 
 namespace af
 {
+
+class ECSManager;
+using ComponentCreateFuncType = std::function<Component*()>;
+using SystemCreateFuncType    = std::function<System*(ECSManager*)>;
+
 class ECSManager final
 {
 public:
@@ -14,6 +20,7 @@ public:
 
     ~ECSManager();
 
+public:
     Entity* newEntity();
 
     Entity* getEntity(EntityId entityId);
@@ -22,23 +29,41 @@ public:
 
     void destroyEntity(Entity* entity);
 
-    void addSystem(System* system);
+public:
+    void registerSystem(const std::string& name, const SystemCreateFuncType& createFunc);
 
-    uint32_t registerComponentType(const std::string& name);
+    System* addSystem(const std::string& name);
+
+public:
+    void registerComponent(const std::string& name, const ComponentCreateFuncType& createFunc);
 
     uint32_t getComponentType(const std::string& name) const;
 
-    void addComponent(Entity* entity, const std::string& name, Component* component);
+    const std::string& getComponentName(ComponentTypeId typeId) const;
+
+    Component* addComponent(Entity* entity, const std::string& name);
 
     void removeComponent(Entity* entity, const std::string& name);
 
+public:
     void update(float dt);
 
 private:
     void doRemoveEntities();
 
 private:
-    std::unordered_map<std::string, uint32_t> m_componentTypes;
+    struct ComponentMeta
+    {
+        uint32_t typeId;
+        ComponentCreateFuncType createFunc;
+    };
+    std::unordered_map<std::string, ComponentMeta> m_componentMetas;
+
+    struct SystemMeta
+    {
+        SystemCreateFuncType createFunc;
+    };
+    std::unordered_map<std::string, SystemMeta> m_systemMetas;
 
     std::vector<System*> m_systems;
     std::vector<Entity*> m_entities;

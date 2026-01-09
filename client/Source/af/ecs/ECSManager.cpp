@@ -20,6 +20,7 @@ ECSManager::~ECSManager()
 
     for (auto& it : m_systems)
     {
+        AF_ECS_LOG("[ECS] Destroy System: %s\n", it->getName().c_str());
         delete it;
     }
 }
@@ -31,6 +32,7 @@ Entity* ECSManager::newEntity()
     entity->m_id         = m_nextEntityId;
     entity->m_ecsManager = this;
     m_entities.push_back(entity);
+    AF_ECS_LOG("[ECS] New Entity [%u] created.\n", entity->getId());
     return entity;
 }
 
@@ -60,8 +62,35 @@ void ECSManager::destroyEntity(Entity* entity)
     }
 }
 
-void ECSManager::addSystem(System* system)
+void ECSManager::registerSystem(const std::string& name, const SystemCreateFuncType& createFunc)
 {
+    assert(m_systemMetas.find(name) == m_systemMetas.end() && "System type already registered.");
+
+    AF_ECS_LOG("[ECS] RegisterSystem: %s\n", name.c_str());
+    SystemMeta meta;
+    meta.createFunc     = createFunc;
+    m_systemMetas[name] = meta;
+}
+
+System* ECSManager::addSystem(const std::string& name)
+{
+    auto it = m_systemMetas.find(name);
+    if (it == m_systemMetas.end())
+    {
+        assert(false && "System type not registered.");
+        return nullptr;
+    }
+
+    auto system = it->second.createFunc(this);
+    assert(system != nullptr && "Failed to create system instance.");
+
+    if (system == nullptr)
+    {
+        return nullptr;
+    }
+
+    AF_ECS_LOG("[ECS] Add System: %s\n", name.c_str());
+    system->m_name = name;
     m_systems.push_back(system);
 
     for (auto entity : m_entities)
@@ -71,44 +100,78 @@ void ECSManager::addSystem(System* system)
             system->addEntity(entity);
         }
     }
+
+    return system;
 }
 
-uint32_t ECSManager::registerComponentType(const std::string& name)
+void ECSManager::registerComponent(const std::string& name, const ComponentCreateFuncType& createFunc)
 {
-    assert(m_componentTypes.find(name) == m_componentTypes.end() && "Component type already registered.");
+    assert(m_componentMetas.find(name) == m_componentMetas.end() && "Component type already registered.");
 
-    uint32_t typeId        = static_cast<uint32_t>(m_componentTypes.size()) + 1;  // Start IDs from 1
-    m_componentTypes[name] = typeId;
-    return typeId;
+    ComponentMeta meta;
+    meta.createFunc        = createFunc;
+    meta.typeId            = static_cast<uint32_t>(m_componentMetas.size()) + 1;  // Start IDs from 1
+    m_componentMetas[name] = meta;
+
+    AF_ECS_LOG("[ECS] RegisterComponent: %s (typeId=%u)\n", name.c_str(), meta.typeId);
 }
 
 uint32_t ECSManager::getComponentType(const std::string& name) const
 {
-    auto it = m_componentTypes.find(name);
-    if (it != m_componentTypes.end())
+    auto it = m_componentMetas.find(name);
+    if (it != m_componentMetas.end())
     {
-        return it->second;
+        return it->second.typeId;
     }
     assert(false && "Component type not registered.");
     return INVALID_COMPONENT_TYPE_ID;
 }
 
-void ECSManager::addComponent(Entity* entity, const std::string& name, Component* component)
+const std::string& ECSManager::getComponentName(ComponentTypeId typeId) const
+{
+    for (const auto& pair : m_componentMetas)
+    {
+        if (pair.second.typeId == typeId)
+        {
+            return pair.first;
+        }
+    }
+    assert(false && "Component type ID not registered.");
+    return "Unknown Component";
+}
+
+Component* ECSManager::addComponent(Entity* entity, const std::string& name)
 {
     if (entity == nullptr)
     {
         assert(false && "Entity is null.");
-        return;
+        return nullptr;
     }
-    component->m_typeId = getComponentType(name);
+
+    auto it = m_componentMetas.find(name);
+    if (it == m_componentMetas.end())
+    {
+        assert(false && "Component type not registered.");
+        return nullptr;
+    }
+
+    Component* component = it->second.createFunc();
+    if (component == nullptr)
+    {
+        assert(false && "Failed to create component instance.");
+        return nullptr;
+    }
+
+    component->m_typeId = it->second.typeId;
 
     if (entity->containsComponentByTypeId(component->m_typeId))
     {
         assert(false && "Entity already contains component of this type.");
         delete component;
-        return;
+        return nullptr;
     }
 
+    AF_ECS_LOG("[ECS] Entity [%u] addComponent: %s (typeId=%u)\n", entity->getId(), name.c_str(), component->m_typeId);
     entity->m_components.push_back(component);
 
     // Update entity signature in systems
@@ -120,6 +183,8 @@ void ECSManager::addComponent(Entity* entity, const std::string& name, Component
             system->addEntity(entity);
         }
     }
+
+    return component;
 }
 
 void ECSManager::removeComponent(Entity* entity, const std::string& name)
@@ -136,6 +201,7 @@ void ECSManager::removeComponent(Entity* entity, const std::string& name)
     {
         if ((*it)->m_typeId == typeId)
         {
+            AF_ECS_LOG("[ECS] Entity [%u] removeComponent: %s (typeId=%u)\n", entity->getId(), name.c_str(), typeId);
             for (auto* system : m_systems)
             {
                 if (system->containsComponentType(typeId))
@@ -169,20 +235,16 @@ void ECSManager::update(float dt)
 
 void ECSManager::doRemoveEntities()
 {
-
     if (m_willRemoveEntities)
     {
         for (auto it = m_entities.begin(); it != m_entities.end();)
         {
             if ((*it)->m_pendingRemoval)
             {
-                for (auto* system : m_systems)
-                {
-                    system->removeEntity(*it);
-                }
-
+                auto entityId = (*it)->getId();
                 delete *it;
                 it = m_entities.erase(it);
+                AF_ECS_LOG("[ECS] Destroy Entity [%u]\n", entityId);
             }
             else
             {

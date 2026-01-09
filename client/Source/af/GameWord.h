@@ -15,7 +15,7 @@ public:
 
     void update(float dt);
 
-    std::unique_ptr<ECSManager> ecsManager;
+    ECSManager ecsManager;
 };
 
 }  // namespace af

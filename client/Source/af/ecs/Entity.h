@@ -15,7 +15,7 @@ public:
 
     EntityId getId() const;
 
-    void addComponent(const std::string& name, Component* component);
+    Component* addComponent(const std::string& name);
 
     void removeComponent(const std::string& name);
 
