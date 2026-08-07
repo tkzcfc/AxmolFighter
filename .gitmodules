@@ -1,0 +1,18 @@
+[submodule "AxmolFighter-Editor"]
+	path = AxmolFighter-Editor
+	url = git@github.com:tkzcfc/AxmolFighter-Editor.git
+[submodule "AxmolFighter-Client"]
+	path = AxmolFighter-Client
+	url = git@github.com:tkzcfc/AxmolFighter-Client.git
+[submodule "AxmolFighter-UI"]
+	path = AxmolFighter-UI
+	url = git@github.com:tkzcfc/AxmolFighter-UI.git
+[submodule "AxmolFighter-Server"]
+	path = AxmolFighter-Server
+	url = git@github.com:tkzcfc/AxmolFighter-Server.git
+[submodule "AxmolFighter-Tools"]
+	path = AxmolFighter-Tools
+	url = git@github.com:tkzcfc/AxmolFighter-Tools.git
+[submodule "AxmolFighter-Config"]
+	path = AxmolFighter-Config
+	url = git@github.com:tkzcfc/AxmolFighter-Config.git
