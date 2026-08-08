@@ -14,9 +14,17 @@ echo "==> AxmolFighter install starting (REPO_ROOT=$REPO_ROOT, AX_ROOT=$AX_ROOT)
 # ---------------------------------------------------------------------------
 # 1. Git submodules (Client / Config / Editor / Server / Tools / UI)
 # ---------------------------------------------------------------------------
-echo "==> Initializing git submodules"
-git -C "$REPO_ROOT" submodule sync --recursive
-git -C "$REPO_ROOT" submodule update --init --recursive
+echo "==> Initializing git submodules (best-effort; some submodules are private)"
+git -C "$REPO_ROOT" submodule sync --recursive || true
+# Initialize each submodule independently so that an inaccessible (private)
+# submodule does not block the ones needed to build the server and Editor.
+git -C "$REPO_ROOT" config --file "$REPO_ROOT/.gitmodules" --get-regexp 'path$' \
+  | while read -r _ sub_path; do
+        [ -n "$sub_path" ] || continue
+        if ! git -C "$REPO_ROOT" submodule update --init --recursive "$sub_path"; then
+            echo "WARN: could not initialize submodule '$sub_path' (private or inaccessible); continuing."
+        fi
+    done
 
 # ---------------------------------------------------------------------------
 # 2. System packages (engine + server toolchain + headless GUI runtime)
