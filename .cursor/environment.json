@@ -1,0 +1,34 @@
+{
+  "name": "AxmolFighter",
+  "install": "bash ./.cursor/install.sh",
+  "start": "bash ./.cursor/start.sh",
+  "terminals": [
+    {
+      "name": "gateway",
+      "command": "cd /workspace/AxmolFighter-Server/game/gateway && RUST_LOG=info ../target/debug/gateway gateway.toml",
+      "description": "Gateway server: accepts game clients on :7000 and backend services on :7100."
+    },
+    {
+      "name": "game",
+      "command": "sleep 3 && cd /workspace/AxmolFighter-Server/game && RUST_LOG=info ./target/debug/game \"$HOME/.axmolfighter/game.dev.toml\"",
+      "description": "Game server: connects to the local PostgreSQL, runs migrations, and registers with the gateway."
+    },
+    {
+      "name": "town",
+      "command": "sleep 3 && cd /workspace/AxmolFighter-Server/game && RUST_LOG=info ./target/debug/town",
+      "description": "Town server: registers with the gateway as service_id=2."
+    }
+  ],
+  "ports": [
+    { "name": "gateway-client", "port": 7000 }
+  ],
+  "repositoryDependencies": [
+    "github.com/tkzcfc/axmol",
+    "github.com/tkzcfc/AxmolFighter-Client",
+    "github.com/tkzcfc/AxmolFighter-Config",
+    "github.com/tkzcfc/AxmolFighter-Editor",
+    "github.com/tkzcfc/AxmolFighter-Server",
+    "github.com/tkzcfc/AxmolFighter-Tools",
+    "github.com/tkzcfc/AxmolFighter-UI"
+  ]
+}
