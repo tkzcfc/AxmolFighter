@@ -13,6 +13,3 @@
 [submodule "AxmolFighter-Config"]
 	path = AxmolFighter-Config
 	url = git@github.com:tkzcfc/AxmolFighter-Config.git
-[submodule "AxmolFighter-Client"]
-	path = AxmolFighter-Client
-	url = git@github.com:tkzcfc/AxmolFighter-Client.git
