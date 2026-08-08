@@ -1,9 +1,6 @@
 [submodule "AxmolFighter-Editor"]
 	path = AxmolFighter-Editor
 	url = git@github.com:tkzcfc/AxmolFighter-Editor.git
-[submodule "AxmolFighter-Client"]
-	path = AxmolFighter-Client
-	url = git@github.com:tkzcfc/AxmolFighter-Client.git
 [submodule "AxmolFighter-UI"]
 	path = AxmolFighter-UI
 	url = git@github.com:tkzcfc/AxmolFighter-UI.git
