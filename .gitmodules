@@ -16,3 +16,6 @@
 [submodule "AxmolFighter-Client"]
 	path = AxmolFighter-Client
 	url = git@github.com:tkzcfc/AxmolFighter-Client.git
+[submodule "heiyue"]
+	path = heiyue
+	url = https://git.argc.online/fc/heiyue.git
