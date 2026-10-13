@@ -27,7 +27,7 @@ AxmolFighter/
 │   ├── heiyue-战斗逻辑.md        # 参照战斗流程（带文件/函数行号）
 │   ├── heiyue-战斗配置.md        # 参照配置表全字段说明
 │   └── heiyue-AI与行为树.md      # AEBT 行为树与 behaviac AI
-└── heiyue/                       # 参照工程源码（Cocos2d-x Lua 完整项目；src/res 被 gitignore，以磁盘为准）
+└── heiyue/                       # 参照工程源码（非 submodule；整目录 gitignore，本地自备）
 ```
 
 > 「黑月」是战斗语义的参照工程。对照文档全部在 `Reference/` 下；实现代码（`AxmolFighter-Client/Source/**`、`AxmolFighter-Server/**`）中不得出现该产品名或盘符路径。

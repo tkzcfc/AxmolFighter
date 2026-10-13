@@ -4,7 +4,7 @@ A fighting game. The client is C++ on the Axmol engine. The backend is Rust micr
 
 The main architecture doc is `README.md`, written in Chinese UTF-8. In PowerShell, read it with `Get-Content -Encoding utf8`. **Update README.md** when you change the directory layout, protocol constants, frame format, service_id, config pipeline or mugen architecture.
 
-## Layout (all git submodules)
+## Layout (git submodules)
 | Dir | What | Details |
 |---|---|---|
 | `AxmolFighter-Client` | Axmol C++ client and shared `mugen` battle core | `AxmolFighter-Client/AGENTS.md` |
@@ -13,7 +13,8 @@ The main architecture doc is `README.md`, written in Chinese UTF-8. In PowerShel
 | `AxmolFighter-Tools` | Codegen: config.bin, protobuf, sol bindings, Spine export | `AxmolFighter-Tools/AGENTS.md` |
 | `AxmolFighter-Editor` | Axmol-based animation/hitbox/scene editor | `AxmolFighter-Editor/AGENTS.md` |
 | `AxmolFighter-UI` | FairyGUI editor project (edited in the FairyGUI editor; no build) | — |
-| `heiyue` | Reference game source (Cocos2d-x Lua). **Read-only** | see below |
+
+`heiyue/` is **not** a submodule: local reference game source (Cocos2d-x Lua), gitignored, read-only. See "Porting from heiyue" below.
 
 The Axmol engine is not in the repo. It needs `AX_ROOT` and the `axmol` CLI from `tkzcfc/axmol@release_custom` (clone it, then run `pwsh $AX_ROOT/setup.ps1`).
 
