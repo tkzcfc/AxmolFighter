@@ -42,6 +42,10 @@
 - 运行时依赖 axmol 的代码只放在 `Source/mugen/render/**`（整体包在 `#ifdef RUNTIME_IN_AXMOL` 内）和 `Source/ui/**`。
 - 新增源文件后，客户端必须重新 configure：在 `AxmolFighter-Client` 下执行 `axmol build -p win32 -c`（即 `gen_project.bat`）。
 - 提交前对改动过的 C++ 文件跑一遍 `AxmolFighter-Client/format_code.ps1`。
+- **注释约束（补充，2026-10-08 用户要求）**：定义类型/对象时，为类型本身、每个成员变量、每个函数都写**简洁中文**注释，说清意图与约束，不要复述类型名。纯机械的 getter/setter 可省略，但任何有语义或有副作用的行为都必须有注释。注释仍受上面的限制（不得出现参照产品名、盘符路径、计划文档路径）。
+- **错误处理（2026-10-08 用户要求）**：`core/`、`sim/` 及 mugen 其余逻辑代码**不使用异常处理错误**；开发期错误用断言（`MG_ASSERT`）加英文错误日志（`MG_LOG_E`）暴露。只有“外部输入导致、且调用方必须优雅处理”的少数场景，才允许返回 `bool` / `std::optional` / `nullptr`（如 `Config::find`），仍然不用 `throw`。`throw` 一律整改掉。
+- **可读性优先（2026-10-08 用户要求）**：架构与逻辑以清晰可读为先，使用直白的语言特性（具名 struct、`enum class`、清晰的函数名与显式参数）；避免炫技、隐式转换、过度模板与难读的链式技巧。
+- **单例约束（2026-10-08 用户要求）**：mugen 在客户端只跑一份，但战斗服可能在同一进程内运行**多个 mugen 实例**。因此只有“进程内共享的只读数据”才允许做成单例或静态（如只读配置、只读骨架/资源缓存、不可变的 `BTDef` 缓存）；承载**每场战斗可变状态**的类型（`World`、ECS、各类 Pool、状态机等）必须是实例，禁止做成单例、全局变量或函数内 `static`。
 
 ### 0.5 本计划不碰的部分
 - 不修改 `AxmolFighter-Server`、`AxmolFighter-Editor`、`AxmolFighter-UI`。
@@ -285,8 +289,9 @@ X(equip, EquipConfig, KeyByIdAndOccupation)
 - **id**：不允许重复，同一张表按 id（或复合键）排序后写出。
 - **引用检查**：`conf/ConfigRefs.h` 中的 `MG_CONFIG_REFS(X)` 声明引用关系，例如 `X(skill, actionIds, action)`；`-1` 和 `0` 视为"空"。
   - 打包输出每类悬空引用的数量和前 5 个样例；
-  - 战斗主链路（skill→action→effect→action_effect→skill_hit→displacement→buff→buff_rule）存在悬空引用时，打包失败；
+  - 战斗主链路（skill→action→effect→action_effect→skill_hit→displacement→buff→buff_rule）的悬空引用**只告警，不失败**：参照工程自身在这条链路上存在 655 处真实悬空引用（已逐项核实非审计脚本错误，例如 `action[902920].effectIds[1]` 的值是字符串 `` `-20 ``、`effect[4].buffId[1]` 的值是小数 `0.15`、`action[501750]` 指向一个两边 effect 源表都不存在的 `effect 501641`）。打包报告仍需完整列出每类悬空引用的数量与样例，供后续排查；运行时查表对这些 id 使用 `find<T>`（可能返回空）而不是 `get<T>`（会断言）。
   - 其余悬空引用只告警。
+  - 本条修订记录：原计划的"战斗主链路悬空引用=打包失败硬门槛"与参照工程实际数据冲突（contract §0.3 规则：语义冲突时参照工程优先，并在 notepad 记录）。决策见 `.omo/notepads/mugen-rewrite/decisions.md` Todo 10 条目。
 - **config.bin 文件头**：`magic "MGCF"`、`version`、`schemaHash`（§3.2）。运行时 schemaHash 不一致就拒绝加载，日志写 `config.bin schema mismatch, re-run config_converter`。
 - **scaffold 子命令**：`config_converter scaffold <kind>` 扫描该表的所有行，推断每个字段的类型（int / Fixed / string / bool / 各层数组深度），打印出结构体草稿。
 

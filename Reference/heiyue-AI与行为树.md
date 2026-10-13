@@ -289,9 +289,14 @@ Selector(0)
        else Sequence(17): CheckHitEnd → ExecuteFirstAttack → CheckAttackEnd → eStatus=Alert          :100-118
 ```
 
-- `<custom>` 中 Condition(34) 的准确语义（每帧检查的中止条件，还是进入序列前的额外条件）取决于 behaviac 版本，**未确认**。从逻辑推断：`CheckAttack` 返回 FAILURE（没有目标）时整个 Alert 分支不执行或中止。
+- 已按 vendored behaviac 3.6.39 源码确认（以下路径相对 `AxmolFighter-Client/Source/3rd/behaviac/`）：
+  - 附件 12/9 都是 `Phase="Enter"`。`behaviortree/behaviortree.cpp:166-201` 区分 Enter/Update/Both，`:204-218` 以第一个有效条件为初值，后续按各自 And/Or 合并。`behaviortree/behaviortree_task.cpp:365-385,524-530` 仅在节点非 Running 时重做进入检查；进入守卫失败返回 Failure，不清除 `eStatus`，也不是每帧抢占守卫。
+  - `<custom>` 加载为独立 `m_customCondition`（`behaviortree/behaviortree.cpp:682-685`），不是普通子节点。Evaluate 进行 Opl/Opr 比较（`behaviortree/nodes/conditions/condition.cpp:71-78`）。
+  - `SequenceUpdate` 仅在即将调用子节点 exec 且传入结果是 Running 时检查 custom；为真直接返回 Failure（`behaviortree/nodes/composites/sequence.cpp:80-117`）。因此 34 在 `CheckAttack()==Failure` 时使 Sequence(10) 失败。
+  - **不等于每帧检查**：Running 叶子被缓存，下一 tick 直接执行该叶子（`behaviortree/behaviortree_task.cpp:754-761,933-968,998-1007`）；结束后把终态向父节点传播。34 不会在 CheckAttackEnd 持续 Running 时重查；该等待成功后，10 即将分派第二个子节点 13 时才再次检查。普通 Selector 不重扫更早兄弟，IfElse 已选分支不重算条件（`selector.cpp:75-105`、`ifelse.cpp:73-111`，均在 nodes/composites 下）。
 - Alert 状态没有退回 NoAlert 的 Assignment，也就是说怪物一旦被惊醒就一直保持警戒（在 XML 中没有看到复位节点）。
-- `ResultOption="BT_INVALID"` 表示使用方法的返回值作为节点状态。
+- `ResultOption="BT_INVALID"` 表示使用方法的返回值作为节点状态；非 Invalid 时仍调用方法，但用配置值覆盖结果（`behaviortree/nodes/actions/action.cpp:181-233`）。Assignment 成功赋值返回 Success（`assignment.cpp:138-153`）。
+- **验收口径（已裁定保持源语义）**：死亡目标重选；无目标且仍为 NoAlert 时巡逻；已经 Alert 且无目标时保持 Alert。`AiAgent.lua:158-164` 只将目标设为自身并返回 Failure；34 令 10 失败，而 31 的 NoAlert 进入守卫拒绝。XML 无巡逻回退路径，不添加隐藏的 NoAlert 赋值。后续 checkAttack 对自身目标的处理仍按 Lua 原样保留，不假定每帧都会随机重选。
 
 **典型怪物流程**
 1. 初始 `eStatus=NoAlert`。没被打且 `target_scope` 内没有敌人时：巡逻（随机点、`patrol_delay_time` 停留）→ 巡逻移动中 `ActionPatrol` 每帧 `checkTarget`，发现敌人就结束移动（`ActionPatrol.lua:54`）→ `CheckMoveEnd` 因目标不是自己返回 FAILURE，中断 Sequence（`AiAgent.lua:293-295`）；否则继续 `ExecuteRandAttack`，释放 Z 槽（非警戒技能）。

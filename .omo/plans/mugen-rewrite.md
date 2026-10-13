@@ -113,7 +113,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
 - **W4 Hits:** 22 → 23. Ends at **M3** (can launch, combo, and kill monsters).
 - **W5 Buff / abilities / AI:** 24 → (25 ∥ 26 ∥ 27 ∥ 28). Ends at **M4** (Buff), **M5** (AI).
 - **W6 Rooms:** 29 → 30. Ends at **M6** (finish a multi-room dungeon locally).
-- **W7 Wrap-up:** 31 → 32. Then the final verification wave.
+- **W7 Wrap-up:** 31 → 32 → 33. Then the final verification wave.
 
 ### Dependency matrix
 | Todo | Depends on | Blocks | Can parallelize with |
@@ -138,7 +138,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
 | 18 | 17 | 23 | 19,21 |
 | 19 | 17 | 20 | 18,21 |
 | 20 | 19 | 22 | 21 |
-| 21 | 13 | 22 | 14–20 |
+| 21 | 13 | 22,33 | 14–20 |
 | 22 | 20,21 | 23 | — |
 | 23 | 18,22 | 24 | — |
 | 24 | 23 | 25,26,27,28 | — |
@@ -149,12 +149,13 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
 | 29 | 25,26,27,28 | 30 | — |
 | 30 | 29 | 31 | — |
 | 31 | 30 | 32 | — |
-| 32 | 31 | F1–F4 | — |
+| 32 | 31 | 33 | — |
+| 33 | 21 | F1–F4 | (runs next, before 20/22+) |
 
 ## Todos
 > Implementation + Test = ONE todo. Never separate. Every todo: read contract §0 first; finish with gates G1–G5 as applicable; write evidence; commit per sub-repo.
 <!-- APPEND TASK BATCHES BELOW THIS LINE WITH edit/apply_patch - never rewrite the headers above. -->
-- [ ] 1. Pre-flight: branches, clean-tree check, baseline record
+- [x] 1. Pre-flight: branches, clean-tree check, baseline record
   What to do:
   - Run `git status --short` in each of `AxmolFighter-Client`, `AxmolFighter-Client/Content`, `AxmolFighter-Tools`, and `AxmolFighter-Config`.
   - If any repo has uncommitted changes: **stop**, mark this todo `[~]`, list the change summary, and ask the user to commit or stash. This is an owner decision. Never commit, stash, or discard the user's changes yourself.
@@ -171,7 +172,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: N
   Recommended task executor category: quick
 
-- [ ] 2. Headless test project, rule-check script, server-side logging, rewrite of mugen/AGENTS.md
+- [x] 2. Headless test project, rule-check script, server-side logging, rewrite of mugen/AGENTS.md
   What to do:
   - Create the `AxmolFighter-Client/TestsHeadless/` standalone CMake project (C++20; MSVC `/utf-8 /permissive- /W4 /bigobj`), producing two targets:
     - `mugen_tests`: doctest; `RUNTIME_IN_AXMOL=0`; uses `CONFIGURE_DEPENDS` globs for `Source/mugen/core/**`, `Source/mugen/conf/**`, `Source/mugen/avatar/**` (excluding `avatar/render/**`) and `Source/mugen/sim/**` (may be empty for now), plus `TestsHeadless/tests/**`.
@@ -209,7 +210,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `test(mugen): add headless test harness and rule checker`
   Recommended task executor category: unspecified-high
 
-- [ ] 3. Remove the old gameplay layer and online mode, keep the client building
+- [x] 3. Remove the old gameplay layer and online mode, keep the client building
   What to do:
   - Delete:
     - `Source/mugen/{GameWord.*,ActorSpawner.*,Components.h,Systems.h}`;
@@ -250,7 +251,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `refactor(mugen): remove legacy gameplay layer and online battle mode`
   Recommended task executor category: unspecified-high
 
-- [ ] 4. core/math: Fixed, FixedVec, FixedMath, Random API
+- [x] 4. core/math: Fixed, FixedVec, FixedMath, Random API
   What to do:
   - Implement everything in contract §2.1–§2.3:
     - `core/math/Fixed.h/.cpp`: Q44.20 representation, operators, `fromInt/fromRaw/ratio`, the `consteval` literal `"..."_fx` (integer parsing, round half up), `floor/ceil/trunc/roundHalfUp/toInt`, and `toFloatForRender`.
@@ -281,7 +282,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(core): add Q44.20 fixed-point math and deterministic random API`
   Recommended task executor category: deep-low
 
-- [ ] 5. core/reflect and serialize (additive, old mechanisms kept)
+- [x] 5. core/reflect and serialize (additive, old mechanisms kept)
   What to do:
   - Implement contract §3:
     - `core/reflect/Reflect.h`: the `MG_REFLECT` / `MG_REFLECT_DERIVED` macros (up to 128 fields), `kMgTypeName`, type traits, and a `static_assert` that rejects unsupported types.
@@ -304,7 +305,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(core): add MG_REFLECT reflection, binary archive and hashing`
   Recommended task executor category: deep-low
 
-- [ ] 6. core/ecs: evolve into Overwatch-style ECS
+- [x] 6. core/ecs: evolve into Overwatch-style ECS
   What to do:
   - Implement all of contract §4 by rewriting the internals of the existing `core/ecs`:
     - generational entity handles with FIFO slot reuse;
@@ -331,7 +332,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `refactor(core): rewrite ecs as data-only pools with deterministic snapshots`
   Recommended task executor category: deep-high
 
-- [ ] 7. core/bt: split definition from instance
+- [x] 7. core/bt: split definition from instance
   What to do:
   - Implement contract §5: `BTDef`, `BTInstance<LeafState>`, `BTRunner`, `BTRegistry` and `BTDefCache`.
   - Port the algorithms line by line from the existing `core/bt/BTSelector.cpp`, `BTSequence.cpp`, `BTParallel.cpp` and `BTComposite.cpp`, with these changes:
@@ -353,7 +354,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `refactor(core): split behavior tree into shared definitions and value instances`
   Recommended task executor category: deep-high
 
-- [ ] 8. Extend the import step: add missing tables, merge split tables, fix field names (Lua side only)
+- [x] 8. Extend the import step: add missing tables, merge split tables, fix field names (Lua side only)
   What to do:
   - Edit `AxmolFighter-Tools/config_converter/script/migrate/import/TableConvert.lua` (`KIND_SPECS`) and `run_table_convert.lua` (kind lists):
     - `effect`: merge `entity_effect` and `entity_effect2` (id ≥ 2000000). Duplicate ids are an error.
@@ -384,7 +385,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Tools: `feat(config): import missing combat tables and merge split tables`; Config: `data: regenerate tables with merged effect/action_effect and new combat kinds`
   Recommended task executor category: unspecified-high
 
-- [ ] 9. Pure C++ config converter skeleton: LuaReader, strict validation, scaffold
+- [x] 9. Pure C++ config converter skeleton: LuaReader, strict validation, scaffold
   What to do:
   - Rebuild `AxmolFighter-Tools/config_converter/CMakeLists.txt`:
     - Keep `lua_static` and the spine static libraries (todo 11 uses them).
@@ -419,7 +420,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Tools: `feat(config): pure C++ lua table reader with strict schema validation`; Client: `feat(conf): reflected skill tables and new Config runtime`
   Recommended task executor category: deep-low
 
-- [ ] 10. All config tables become reflected structs; runtime Config; repack config.bin
+- [x] 10. All config tables become reflected structs; runtime Config; repack config.bin
   What to do:
   - For every Config kind (all files under `AxmolFighter-Config/table/` after todo 8):
     - Use the `scaffold` draft as a starting point and hand-write the reflected structs into `conf/tables/*.h`, split by domain: Skill / Action / Entity / Buff / Ai / Map / Sound / Equip / Fashion / Item.
@@ -464,7 +465,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(conf): reflected config tables for all kinds`; Tools: `feat(config): pack all kinds with reference checks`; Content: `data: regenerate config.bin`
   Recommended task executor category: deep-high
 
-- [ ] 11. Migrate avatar data to reflection; pack avatar.bin in C++; spine-box export in C++; delete legacy mechanisms
+- [x] 11. Migrate avatar data to reflection; pack avatar.bin in C++; spine-box export in C++; delete legacy mechanisms
   What to do:
   - Convert these to plain reflected structs (no longer inheriting Object):
     - `avatar/data/{CombatTimeline,MotionMap,AniData,AvatarAssetCache}`;
@@ -503,7 +504,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `refactor(mugen): drop Object serialization, reflect avatar data`; Tools: `feat(config): C++ avatar.bin packing and spine box export, remove lua pack`; Content: `data: regenerate avatar.bin`
   Recommended task executor category: deep-low
 
-- [ ] 12. sim/World infrastructure: tick pipeline, input, events, timers, snapshots, CLI, scenario harness
+- [x] 12. sim/World infrastructure: tick pipeline, input, events, timers, snapshots, CLI, scenario harness
   What to do:
   - `sim/World.{h,cpp}`:
     - `init(WorldSetup{seed, mode: Battle|Town, roomId/mapKey})`, `tick(const FrameInput&)`;
@@ -532,7 +533,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): world tick pipeline, inputs, timers, presentation events, replay`
   Recommended task executor category: deep-high
 
-- [ ] 13. Character foundations: spawning, attributes, status bits, extra states, map region, motion and hitbox sampling
+- [x] 13. Character foundations: spawning, attributes, status bits, extra states, map region, motion and hitbox sampling
   What to do:
   - `sim/spawn/`: `spawnRole(World&, RoleSpawnParams{roleId, camp, level, aiDifficulty, position, toward, playerSlot?, isAi})`.
     - Order follows `EntityRole:init` (`EntityRole.lua:536-727`): getAIData (`:836-873`), camp and hostile camp, initial fields, timeRage.
@@ -567,7 +568,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): role spawning, attributes, status bits, extra states, map region`
   Recommended task executor category: deep-high
 
-- [ ] 14. Displacement, ROLE/CITY tree templates, movement leaves
+- [x] 14. Displacement, ROLE/CITY tree templates, movement leaves
   What to do:
   - `sim/motion/Displacement`: a faithful port of `ComponentDisplacement.lua:144-291` (`updateLogicDisplacement`), `:394-601` (calculateVelocity/Gravity/Displacement, setDisplacementData, tracking), and the event detection, including:
     - trapezoidal integration;
@@ -599,7 +600,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): displacement port, role/city tree templates, locomotion leaves`
   Recommended task executor category: deep-high
 
-- [ ] 15. Presentation layer and local driver: Presenter, LocalBattleMode, ControlManager, debug panel, offline entry
+- [x] 15. Presentation layer and local driver: Presenter, LocalBattleMode, ControlManager, debug panel, offline entry
   What to do:
   - `Source/mugen/render/battle/` (contract §9.1):
     - `WorldPresenter`;
@@ -640,7 +641,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(render,ui): battle presenters, local fixed-step mode, control manager, offline entry`
   Recommended task executor category: unspecified-high
 
-- [ ] 16. Town adaptation (CITY mode, remote players as puppets) — milestone M1
+- [x] 16. Town adaptation (CITY mode, remote players as puppets) — milestone M1
   What to do:
   - `TownView` uses `World(mode=Town)`:
     - the local player is driven by ControlManager movement;
@@ -661,7 +662,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(ui): town view on sim world with puppet remote players`
   Recommended task executor category: unspecified-high
 
-- [ ] 17. SkillPool / SkillBase / SkillAi (data + logic)
+- [x] 17. SkillPool / SkillBase / SkillAi (data + logic)
   What to do:
   - Component `SkillPool`, value types only:
     - the slot table; slot strings are interned to small integer codes, keeping the original string for debugging;
@@ -705,7 +706,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): skill pool, skill casting rules and skill ai gate`
   Recommended task executor category: deep-high
 
-- [ ] 18. Attack subtree building and attack conditions
+- [x] 18. Attack subtree building and attack conditions
   What to do:
   - Build the subtree as in `SkillPool.lua:672-914`:
     - `createAttackSlotNode`, `createAttackSkillNode`, `createAttackPipeNode`, `createAttackReleaseTypeNode`, `createAttackTowardNode`;
@@ -729,7 +730,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): attack subtree builder and attack conditions`
   Recommended task executor category: deep-low
 
-- [ ] 19. AttackRole leaf (including the ActionAttack base class)
+- [x] 19. AttackRole leaf (including the ActionAttack base class)
   What to do:
   - `ActionAttack`, `heiyue/src/module/behaviortree/actions/ActionAttack.lua:5-275`:
     - animation end and loop count;
@@ -762,7 +763,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): attack role action with interrupt windows, effects timing, static`
   Recommended task executor category: deep-high
 
-- [ ] 20. Effect entities: EFFECT tree, AttackEffect, lifecycle — milestone M2
+- [x] 20. Effect entities: EFFECT tree, AttackEffect, lifecycle — milestone M2
   What to do:
   - `sim/effect/`, following the reference:
     - `EntityEffect:init` (`heiyue/src/module/entity/EntityEffect.lua:62-231`), including sharing the owner's attributes (`:118`, stores the owner Entity);
@@ -791,7 +792,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): effect entities, effect tree and attack effect action`
   Recommended task executor category: deep-high
 
-- [ ] 21. Collision: 2D AABB in screen space, depth-radius filter, contact state machine
+- [x] 21. Collision: 2D AABB in screen space, depth-radius filter, contact state machine
   What to do:
   - Implement everything in contract §8 under `sim/collision/`:
     - In the component phase, sample `ColliderState`.
@@ -821,7 +822,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): screen-plane aabb collision with depth radius filter`
   Recommended task executor category: deep-low
 
-- [ ] 22. Hit flow and damage: dealWithHitX, damage formula, modifyHp, energy
+- [x] 22. Hit flow and damage: dealWithHitX, damage formula, modifyHp, energy
   What to do:
   - Port all of the following in `sim/hit/`:
     - `EntityEffect:onCollisionEvent` (`EntityEffect.lua:348-394`);
@@ -863,7 +864,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): hit pipeline, damage formula, hp modification and energy`
   Recommended task executor category: ultrabrain
 
-- [ ] 23. Hit-reaction state leaves: Hit / HitSwitch / HitUp / HitDown / HitFloor / GetUp / Wake / Death / Revive — milestone M3
+- [x] 23. Hit-reaction state leaves: Hit / HitSwitch / HitUp / HitDown / HitFloor / GetUp / Wake / Death / Revive — milestone M3
   What to do:
   - Each item below is a line-by-line port from `heiyue/src/module/behaviortree/actions/`:
     - `ActionCanBreakBase` (`:10-34`, breakaway);
@@ -894,7 +895,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): hit reaction state leaves, rigidity, hit protection`
   Recommended task executor category: deep-high
 
-- [ ] 24. BuffPool core and BFEvent wiring
+- [x] 24. BuffPool core and BFEvent wiring
   What to do:
   - `sim/buff/`. Data lives in components (instance array, immunity table, CD table, per-rule counters). Port:
     - BFEvent `heiyue/src/module/buff/BuffPool.lua:2-75`;
@@ -933,7 +934,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): buff pool core, buff lifecycle and event triggers`
   Recommended task executor category: deep-high
 
-- [ ] 25. Buff rules: xstatus status classes
+- [x] 25. Buff rules: xstatus status classes
   What to do:
   - Using `buff-rule-usage.md`, port rules from `heiyue/src/module/buff/xstatus/*.lua` (70 files) one by one into the rule table, highest usage first. Each file maps to one rule implementation.
   - **Every rule referenced by combat data must be ported.** Unreferenced ones may stay `kUnportedRule`, listed in evidence.
@@ -950,7 +951,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): port status buff rules`
   Recommended task executor category: deep-low
 
-- [ ] 26. Buff rules: xbasic numeric classes
+- [x] 26. Buff rules: xbasic numeric classes
   What to do:
   - Same as 25, applied to `heiyue/src/module/buff/xbasic/*.lua` (91 files: attributes, damage modifiers, shields, CD changes, consumption scaling, AddBy*/Remove*, etc.).
   - Every rule referenced by combat data must be ported.
@@ -968,7 +969,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): port numeric buff rules`
   Recommended task executor category: deep-low
 
-- [ ] 27. Special abilities (SpecialAbilityPool)
+- [x] 27. Special abilities (SpecialAbilityPool)
   What to do:
   - Port `heiyue/src/module/specialAbility/{SpecialAbilityPool,SpecialAbilityBase,SpecialAbilityCondition}.lua` into `sim/ability/`, with data in components.
   - Wire every `ability::trigger` call point (BEFORE/AFTER_CASTSKILL, AFTER_TOBEHIT, AFTER_HIT, and the like, per the reference).
@@ -982,7 +983,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): special abilities`
   Recommended task executor category: deep-low
 
-- [ ] 28. Monster AI: behaviac-semantics runtime, Entity.xml decision tree, AiAgent, movement leaves — milestone M5
+- [x] 28. Monster AI: behaviac-semantics runtime, Entity.xml decision tree, AiAgent, movement leaves — milestone M5
   What to do:
   - In `sim/ai/`, implement a minimal decision-tree runtime covering the node types used in `heiyue/src/imports/behaviac_exported/Entity.xml`: Selector, Sequence, IfElse, Condition/Method (ResultOption), Assignment, precondition, custom attachment.
   - Semantics follow `AxmolFighter-Client/Source/3rd/behaviac` (vendored 3.6.39). Settle the exact semantics of precondition and `<custom>` Condition(34) by reading the source, record them in decisions.md, and add them to `Reference/heiyue-AI与行为树.md` §B.4.
@@ -1013,7 +1014,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): monster ai decision tree and ai movement actions`
   Recommended task executor category: ultrabrain
 
-- [ ] 29. Room flow: state machine, monster spawns, waves, win/lose, KO slow-mo, revive
+- [x] 29. Room flow: state machine, monster spawns, waves, win/lose, KO slow-mo, revive
   What to do:
   - `sim/room/`, with the `RoomState` singleton:
     - `setExpectRoomState` / `updateCheckRoom` (`heiyue/src/scene/GameScene.lua:245,286`, including the `ROOM_STATE_INTERNAL` wait; skip the story hook);
@@ -1048,7 +1049,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim,ui): room state machine, monster waves, victory/failure, ko slow motion, revive`
   Recommended task executor category: deep-high
 
-- [ ] 30. Portals, room switching, obstacles, drops, summons, jostling — milestone M6
+- [x] 30. Portals, room switching, obstacles, drops, summons, jostling — milestone M6
   What to do:
   - Portal entities:
     - `heiyue/src/module/entity/EntityPortal.lua`;
@@ -1086,7 +1087,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `feat(sim): portals and room transfer, obstacles, drops, summons`
   Recommended task executor category: deep-high
 
-- [ ] 31. Determinism and golden test suite
+- [x] 31. Determinism and golden test suite
   What to do:
   - Replays:
     - Record replays from scenario scripts covering 3 rooms (including AI, buffs, waves and room switching), saved under `TestsHeadless/data/replays/`.
@@ -1107,7 +1108,7 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client: `test(sim): determinism, snapshot/rollback and golden suites`
   Recommended task executor category: deep-low
 
-- [ ] 32. Documentation updates
+- [x] 32. Documentation updates
   What to do:
   - Root `README.md`: rewrite the "战斗核心（mugen）" section (layering core/conf/avatar/render/sim, system order replaced by the tick pipeline, behavior tree definition/instance split, snapshots), the "配置流水线" section (drop the wrong HACKER_DATA_INIT statement, the C++ converter, the strict rules, scaffold), the "Avatar 模型" section (AvatarRenderSystem/AvatarComponent → AvatarPresenter/MotionState), and the code conventions section. Make sure there are no references to the `.omo` path.
   - `AxmolFighter-Client/AGENTS.md` (TestsHeadless commands, offline arguments).
@@ -1126,22 +1127,237 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
   Commit: Y | Client/Tools/Config: `docs: update for mugen rewrite`; root repo: not committed.
   Recommended task executor category: writing
 
+- [x] 33. Code-convention retrofit (Chinese comments / no-throw error handling / readability / singleton boundary)
+  What to do:
+  - Apply four user-mandated conventions (authoritative text in `.omo/specs/mugen-rewrite-architecture.md` §0.4) to ALL code written in Todos 1–32, and mirror them into `Source/mugen/AGENTS.md`:
+    1. **Comments**: every type, member variable, and function under `Source/mugen/{core,conf,avatar,sim}` gets a concise Chinese comment stating intent/constraints. Trivial accessors may be omitted; anything with behavior/semantics must be commented. Comments must still not name the reference product or contain drive-letter / plan-doc paths (contract §0.4).
+    2. **No exceptions**: remove every `throw` from mugen logic (`core/`, `sim/`, `conf/`, `avatar/`). Replace with `MG_ASSERT` + `MG_LOG_E` (English). Keep failure-returning APIs (`bool` / `std::optional` / `nullptr`) only where a caller must handle failure gracefully (`Config::find`, `ECSManager::tryGet`, `Replay::load`). Update affected `TestsHeadless` tests that currently assert `CHECK_THROWS_AS` / `std::invalid_argument` to assert the new behavior (Debug assertion / logged failure / returned `false`).
+    3. **Readability**: behavior-preserving clarity pass over the changed files (named structs, `enum class`, explicit params, plain constructs; no clever templates/implicit conversions/hard-to-read chaining), especially in architecture code.
+    4. **Singleton audit**: confirm no per-battle *mutable* state is a singleton/global/function-local `static` — a battle server may run multiple mugen instances in one process. Only process-wide *read-only* data may be static (read-only config, shared skeleton/resource caches, immutable `BTDef` cache). Audit `conf::Config::instance()`, `AvatarAssetCache::getInstance()`, the `behavior::definition(...)` static `BTDefCache`, and every `static` under `sim/`; record each finding and fix in `.omo/notepads/mugen-rewrite/decisions.md`.
+  - Add the four style rules as binding text to `Source/mugen/AGENTS.md`.
+  Must NOT do: change gameplay behavior or semantics; change config serialization/schemas; touch the reference source, Server, Editor, or UI.
+  Closes: (quality retrofit; backs IS-8)
+  Parallelization: W3+ (cleanup) | Blocked by: 21 | Blocks: F1–F4 | Execution order: run FIRST among remaining tasks — immediately after 21, before 20 and 22–32, so the conventions apply to all code written from here on and the pre-rule code (todos 1–21) is fixed before more is layered on top.
+  References: contract §0.4; `Source/mugen/AGENTS.md`; the code written in Todos 1–32.
+  Acceptance criteria:
+  - `rg -n "throw " AxmolFighter-Client/Source/mugen/core AxmolFighter-Client/Source/mugen/sim` returns nothing.
+  - Every type/member/function in `core/ conf/ avatar/ sim/` carries a concise Chinese comment (spot-check + reviewer sign-off).
+  - Singleton audit recorded in decisions.md; no per-battle mutable `static`/singleton remains.
+  - G1 full headless suite green, G2 `check_rules.ps1` exit 0, G3 client configure+build exit 0.
+  - `Source/mugen/AGENTS.md` and contract §0.4 carry the four rules.
+  QA scenarios: Happy path: the commands above. Failure path: none (behavior-preserving refactor). Evidence: `task-33.md`.
+  Commit: Y | Client: `refactor(mugen): chinese comments, no-throw errors, readability, singleton audit`
+  Recommended task executor category: unspecified-high
+
+- [x] 34. Cross-todo fix: control quadrant mapping and locomotion axes (discovered blocker for G1/F1)
+  What to do: Fix the input-direction integration defect discovered at final verification. C++ `ControlManagerCore::direction()` renumbered physical directions (right→2, left→4, up→1, down→3), diverging from the reference `ControlManager.lua:slope2angle90` (right→1, left→3, up→4, down→2 with KeyCodeX d=+1/a=-1, KeyCodeY w=+1/s=-1). `RoleTree.cpp` and the other control-direction consumers (`ActionAttack.cpp`, `Effect.cpp`) used vector signs diverging from reference `Quadrant2Vector` (`EntityBase.lua:803-883`). Result: physical Right moved +z instead of +x (LocomotionTest:84 `after.z > before.z`). Correct direction()/angle and the vector signs to the reference, fix ComboTest's physical sequence and LocomotionTest expectations to reference behavior, then re-record the task-31 replays/hash files.
+  Closes: GAP-1 (movement feel); unblocks G1 for F1.
+  Execution: after 31. Verification: full headless suite exits 0 (225 cases / 245170 assertions), check_rules exits 0, 3x `mugen_sim_cli replay ... --compare ...` exit 0.
+  Evidence: `.omo/evidence/mugen-rewrite/task-31-movement-fix.md`; corrected `task-31.md`.
+  Commit: Y | Client: `fix(sim): correct control quadrant mapping and locomotion axes to match reference`
+
+- [x] 35. IS-1 sprint-attack cast scenario
+  What to do: Add a headless scenario that drives production `dealWithButton` / `dealButtonEvent` while `SkillPool::m_canSprint` is set and the role is in run status (or the current skill base slot is Y and not final). Assert the selected slot becomes Y and a sprint skill is preset or cast. Do not satisfy this with `getGivenSkill(..., "Y")` loadout presence alone. Keep the reference redirect: attack A during run or an in-progress non-final Y skill selects Y; otherwise it stays A.
+  Must NOT do: change sprint semantics, retune locomotion axes, edit plan checkboxes, or modify any test file except the new `SprintCastTest.cpp` (and CMake only if tests are not globbed).
+  Closes: GAP-1 / IS-1 sprint-attack clause (F4 REJECT 2026-10-09).
+  Execution: after 34; parallel with 36, 37, 38 (isolated new test file).
+  Acceptance criteria: `pwsh AxmolFighter-Client/TestsHeadless/run_headless_tests.ps1 -Filter "*Sprint*"` exits 0 and the new case fails if the Y redirect is removed. Existing full suite still green.
+  QA scenarios: Happy path: running plus attack A selects Y. Failure path: `m_canSprint` false keeps slot A. Evidence: `.omo/evidence/mugen-rewrite/task-35.md`.
+  Commit: Y | Client: `test(sim): sprint-attack Y redirect via dealWithButton`
+  Recommended task executor category: unspecified-low (quota: do not use deep-low/deep-high)
+  Parent-verified 2026-10-09: Client commit `f4182a0`; `*Sprint*` 4 cases / 33 assertions / 0 failed; production redirect `SkillInput.cpp:67-71`; evidence `task-35.md`. No production edit.
+
+- [x] 36. IS-1 active dodge scenario (skill slot F)
+  What to do: Add a headless hit scenario whose target current skill base slot is F. Assert the hit takes the active-dodge path: no damage application and a DODGE presentation tip (the passive attribute-dodge roll stays a separate path and must still be covered by the existing damage golden). Do not treat `attributeDodge` or `Damage golden same inputs and ordered draws` as this scenario.
+  Must NOT do: reorder dodge, crit, and spread draws; edit plan checkboxes; modify any test file except the new `ActiveDodgeTest.cpp` (and CMake only if tests are not globbed).
+  Closes: GAP-1 / IS-1 active-dodge clause (F4 REJECT 2026-10-09).
+  Execution: after 34; parallel with 35, 37, 38 (isolated new test file).
+  Acceptance criteria: `pwsh AxmolFighter-Client/TestsHeadless/run_headless_tests.ps1 -Filter "*Dodge*"` exits 0 with a case that requires slot F. Removing the slot-F check in the hit path fails that case. Existing damage golden still passes.
+  QA scenarios: Happy path: slot F dodges. Failure path: a non-F slot with a failing attribute roll still applies damage. Evidence: `.omo/evidence/mugen-rewrite/task-36.md`.
+  Commit: Y | Client: `test(sim): active dodge via skill slot F`
+  Recommended task executor category: unspecified-low (quota: do not use deep-low/deep-high)
+  Parent-verified 2026-10-09: Client commit `10c4e52` (ActiveDodgeTest.cpp + Hit.cpp main-path skip at `:259-264`); parent re-ran `*Dodge*` 2 cases / 33 assertions / 0 failed. Slot F emits DODGE and keeps HP; non-F with failing attribute roll still damages.
+
+- [x] 37. IS-1 crazy-mode entry scenario
+  What to do: Add a scenario that enters crazy through the production entry hook (buff crazy enter or the player action that sets `SkillPool::m_crazy`), starting from `m_crazy == false`. Assert `m_crazy` becomes true and the next cast of a slot that has a crazy variant selects the `+` skill. Keep the existing drain test: EP reaches zero and crazy does not end until `m_slotChanged`. Do not preset `m_crazy = true` as the only setup for the entry assertion.
+  Must NOT do: change crazy EP-drain semantics; edit plan checkboxes; modify `SkillAiTest.cpp`; modify any test file except the new `CrazyEntryTest.cpp` (and CMake only if tests are not globbed).
+  Closes: GAP-1 / IS-1 crazy-entry clause (F4 REJECT 2026-10-09).
+  Execution: after 34; parallel with 35, 36, 38 (isolated new test file).
+  Acceptance criteria: `pwsh AxmolFighter-Client/TestsHeadless/run_headless_tests.ps1 -Filter "*Crazy*"` exits 0 and includes both entry-plus-crazy-slot selection and the existing EP-drain wait. Evidence: `.omo/evidence/mugen-rewrite/task-37.md`.
+  Commit: Y | Client: `test(sim): crazy-mode entry then plus-slot selection`
+  Recommended task executor category: unspecified-low (quota: do not use deep-low/deep-high)
+  Parent-verified 2026-10-09: Client commit `e40a850`; parent re-ran `*Crazy*` 2 cases / 24 assertions / 0 failed (new BuffCrazy entry + existing EP-drain). Production entry `BuffRules.cpp:315-320`; plus rewrite `SkillInput.cpp:84`. No production edit.
+
+- [x] 38. IS-1 B/C/D and motion-command cast scenario
+  What to do: Add scenarios that pass `CTR_ATKB`, `CTR_ATKC`, `CTR_ATKD` (or the JOY B/C/D events the input layer actually emits) into `dealWithButton` and assert the resolved slots are B, C, and D (including the `_2` form when that is the event mapping). Feed the existing Down-Left-Up-Right-Down plus AttackA sequence's `CTR_JOY1` into `dealWithButton` on a pool that has the matching rock skill, and assert that skill is selected. Assert fallback to A when the rock skill is absent. `ControlManager combo emits joystick event` and `getGivenSkill` loadout checks are not sufficient by themselves.
+  Must NOT do: change the combo physical order (Down, Left, Up, Right, Down) or the quadrant numbering from todo 34; edit plan checkboxes; modify `ControlManagerTest.cpp` or `SkillCastingTest.cpp`; modify any test file except the new `SkillButtonCastTest.cpp` (and CMake only if tests are not globbed).
+  Closes: GAP-1 / IS-1 B/C/D and motion-command clauses (F4 REJECT 2026-10-09).
+  Execution: after 34; parallel with 35, 36, 37 (isolated new test file).
+  Acceptance criteria: `pwsh AxmolFighter-Client/TestsHeadless/run_headless_tests.ps1 -Filter "*SkillButton*"` exits 0 and the new cases fail if event-to-slot mapping for B, C, D, or JOY1 is removed. (Plan F4 text said `*Skill*`; use `*SkillButton*` so this file is uniquely filterable and does not collide with sibling filters.) Evidence: `.omo/evidence/mugen-rewrite/task-38.md`.
+  Commit: Y | Client: `test(sim): B/C/D and JOY1 cast through dealWithButton`
+  Recommended task executor category: unspecified-low (quota: do not use deep-low/deep-high)
+  Parent-verified 2026-10-09: Client commit `f359f9a`; parent re-ran `*SkillButton*` 4 cases / 69 assertions / 0 failed. Production `eventSlot` `SkillInput.cpp:15-20` and JOY fallback `:73-81` unchanged. Cases: ATKB/C/D → B/C/D; JOYB/C/D → mode 2; JOY1 selects `1+`; absent rock falls back to A.
+
+- [x] 39. F2 §0.4: delete unused float/double serialize helpers and commit unordered-trait removal
+  What to do: Delete ByteBuffer and EndianUtils float/double methods, if-constexpr arms, and helpers. Delete the four `DeferredDeterminismPaths` entries in `TestsHeadless/check_rules.ps1` so a reintroduction fails G2. Commit the working-tree removal of `unordered_map`/`unordered_set` traits from `ByteBuffer.h` (already deleted in the dirty tree, still present on committed HEAD `4f08561`). Parent grep of `writeFloat32|readFloat32|getFloat32|writeFloat64|EndianUtils::` under `Source/` shows no caller outside these two types.
+  Must NOT do: change live snapshot/hash serialization of production types; retune locomotion; edit plan checkboxes; modify `SprintCastTest.cpp` / `ActiveDodgeTest.cpp` / `CrazyEntryTest.cpp` / `SkillButtonCastTest.cpp`; reintroduce exemptions; touch `sim/` combat files.
+  Closes: F2 REJECT blockers 1 and 2 (2026-10-09, `F2-code-quality.md`).
+  Execution: after F2 REJECT; parallel with 36, 37, 38 (isolated serialize/utils + check_rules files).
+  Acceptance criteria: `pwsh AxmolFighter-Client/TestsHeadless/check_rules.ps1` exits 0 with the four exemptions gone; no float/double APIs remain in ByteBuffer/EndianUtils; no `unordered_map`/`unordered_set` in `core/` or `sim/`; full headless suite still green. Evidence: `.omo/evidence/mugen-rewrite/task-39.md`.
+  Commit: Y | Client: `fix(core): remove float and unordered serialize helpers`
+  Recommended task executor category: unspecified-low (quota: do not use deep-low/deep-high)
+  Parent-verified 2026-10-10: Client commit `d7542d2e84ba87d59afcf9dc7e41a316dc3c6121` (message exact; five files only). `check_rules.ps1` exit 0 with DeferredDeterminismPaths gone and `$checkDeterminismTokens = $inCoreOrSim`. ByteBuffer/EndianUtils have no float/double APIs and no unordered traits. Grep of core/sim unordered_map/unordered_set empty. Parent re-ran full headless: 236 passed / 245326 assertions / 0 failed, EXIT=0. Evidence: `.omo/evidence/mugen-rewrite/task-39.md`.
+
+- [x] 40. F2 §0.4: commit Object/Vec deletion and BTDef no-throw rewrite so committed HEAD passes G2
+  What to do: The 2026-10-10 F2 re-review (`F2-code-quality-rereview.md`, `VERDICT: REJECT`) closed todo 39's two blockers on HEAD `d7542d2`, then found three remaining HEAD-only §0.4 failures that the working tree already fixes but has not committed: (1) `core/Object.h` / `Object.cpp` process-wide `std::unordered_set<Object*> g_objectSet`; (2) `core/math/Vec2.h` / `Vec3.h` unguarded `float` fields; (3) eleven runtime `throw std::invalid_argument` in `core/bt/BTDef.h` / `BTDef.cpp` (branch-added; not the consteval Fixed.h allowance). Commit the existing working-tree deletions of Object/Vec2/Vec3, add `IntVec2.h` / `IntVec3.h`, rewrite BTDef throws to `MG_LOG_E` + `MG_ASSERT`, and commit every HEAD dependent that still includes those deleted headers so a `git archive HEAD` copy of `check_rules.ps1 -Paths core,sim` exits 0. Parent-confirmed HEAD includes: `avatar/MotionPlayer.h`, `avatar/data/AniData.h`, `avatar/data/MotionMap.h`, `conf/GameDef.h`, `conf/LayerLoader.h`, `conf/MapScope.h`, `conf/TableConfig.h`, `core/math/DamageBox.h`, `core/math/Random.h`, `render/LayerRuntimeLoader.h`, `render/RenderUtils.h`, `render/VirtualCamera.h`. Working-tree already replaces Object/Vec includes with IntVec/FixedVec and deletes TableConfig.h; include `.cpp` siblings only when the header change requires them to compile.
+  Must NOT do: dump the entire Client dirty tree (sim/, TestsHeadless tests, UI, CMake, .clangd); retune locomotion; edit plan checkboxes; modify Sprint/Dodge/Crazy/SkillButton tests; reintroduce float/unordered/throw in core/sim; touch sim/ combat files except if a HEAD include of Object/Vec forces it (parent grep of HEAD sim/ had no Object/Vec includes); push; commit the root repo; change submodule pointers; amend `d7542d2`.
+  Closes: F2 REJECT blockers 1–3 (2026-10-10, `F2-code-quality-rereview.md`).
+  Execution: after F2 re-review REJECT; sequential before a FRESH F2 session. Do not resume `ses_edb8c30c9ffel6Mz1TnkQ1h3rC` for implementation.
+  Acceptance criteria: `git archive HEAD Source/mugen TestsHeadless/check_rules.ps1` into a temp dir, then that copy of `check_rules.ps1 -Paths core,sim` exits 0; `git grep -nE '\bthrow\b' HEAD -- Source/mugen/core Source/mugen/sim` matches only the five consteval `Fixed.h` hits; `git grep` HEAD of `unordered_map|unordered_set` under core/sim is empty; `git grep` HEAD of `Object.h|Vec2.h|Vec3.h` under Source excluding 3rd is empty; full `pwsh AxmolFighter-Client/TestsHeadless/run_headless_tests.ps1` exits 0. Evidence: `.omo/evidence/mugen-rewrite/task-40.md`.
+  Commit: Y | Client: `fix(core): drop Object/Vec float types and BTDef runtime throws`
+  Recommended task executor category: deep-low (cheap pools quota_exceeded; worker settles the dependent-file allowlist from git grep of HEAD)
+  Parent-verified 2026-10-10: Client commit `c2925b4b82afec0214ed4fed46ddf273b79b77b9` (parent `d7542d2`, message exact). Deleted Object.h/.cpp, Vec2/Vec3 .h+.cpp, TableConfig.h; added IntVec2.h/IntVec3.h; BTDef uses MG_LOG_E + MG_ASSERT. Extra allowlist: AvatarAssetCache and CombatTimeline (HEAD derived from Object). Parent git-archive HEAD `check_rules.ps1 -Paths core,sim` EXIT=0; git grep HEAD unordered empty; throw only five consteval Fixed.h; Object.h/Vec2.h/Vec3.h gone from HEAD tree. Parent re-ran full headless: 236 passed / 245326 assertions / 0 failed, EXIT=0. Evidence: `.omo/evidence/mugen-rewrite/task-40.md`.
+
+- [x] 41. Playtest: stop portal MotionPlayer::bind spam (room 20002)
+  What to do:
+  - User repro: `AxmolFighter-Client.exe --offline-room=20002 --offline-role=mage` (cwd `AxmolFighter-Client/Content`) prints every logic frame `MotionPlayer::bind: motion map not found 'mugen/motion/por/tx_ui_sizhongchuansongmen.motion'`.
+  - Root cause (verified): `room.lua` 20002 → portal 101 → `res_spine` 1222 → `mugen/spine/por/tx_ui_sizhongchuansongmen.skel`. `RoomEntities.cpp` `base()` always writes `motion.motionFile = AvatarPaths::motionFileFromSpine(...)`. Portal `update()` calls `animate()` every tick; `animate()` constructs a fresh `MotionPlayer` and `bind()`s. `bind` logs on every miss and does not clear `MotionState.motionFile`. `Content/mugen/motion/por/` does not exist; `avatar.bin` has no `por` keys. Reference portals are Spine appearance + radius collision, not combat `.motion` timelines (`Reference/heiyue-战斗逻辑.md` portal section; `heiyue-战斗配置.md` entity_portal).
+  - Ruling (do not reopen): portals MUST NOT bind a combat `.motion`. Do NOT generate `motion/por/*.motion`. Do NOT run `pack-avatar` or `run_spine_box_batch.ps1`. Do NOT edit Tools.
+  - Code:
+    - `RoomEntities.cpp` `base()`: when `group == GroupKind::Portal`, leave `MotionState.motionFile` empty. Still apply `res_spine.scale` onto `Transform.scale` when the spine row exists.
+    - Extract the radius AABB write currently inside `animate()`'s failure branch into a local helper (anonymous namespace). Portal `update()` MUST NOT call `animate()`. Every portal tick: write the radius AABB, then if `PortalPhase::Transfer` and `RoomState.m_transferRoom == 0`, write transfer fields exactly as today (`RoomEntities.cpp:245-253`). Keep the one-frame delay: collision sets Transfer, the next portal `update` commits `m_transferRoom` (current missing-motion behavior).
+    - Goods and Obstacle keep calling `animate()`.
+    - `MotionPlayer::bind`: log each distinct missing path at most once (English). Use a file-scope `std::set<std::string>` solely for log de-dupe (not battle state, not `unordered_set`). Empty path: no log.
+  - Tests: new headless case (globbed). Load production config, `run-room` 20002 for ≥30 frames. Every `PortalState` entity has empty `motionFile` and non-empty `ColliderState.damage`. Capture `mugen_sim_cli run-room 20002 --frames 60` stderr: it MUST NOT contain `tx_ui_sizhongchuansongmen.motion` or `MotionPlayer::bind: motion map not found`.
+  - Append the ruling to `.omo/notepads/mugen-rewrite/decisions.md` (append only). Evidence: `.omo/evidence/mugen-rewrite/task-41.md`.
+  Must NOT do: generate `.motion`; pack avatar.bin; edit Tools/Server/Editor/UI/heiyue; change portal collision/jostle/openPortals phase machine except removing `animate()`; change Goods/Obstacle bind success path; edit plan checkboxes; use a worktree; push; mark F3 `[x]`.
+  Closes: F3 playtest gap (portal log spam); IS-4 portal operability.
+  Parallelization: W8 | Blocked by: 30 | Blocks: F3 | Can parallelize with: 42, 43, 44
+  References: `RoomEntities.cpp:36-67,69-91,163-178,242-255`; `MotionPlayer.cpp:13-25`; `.omo/notepads/mugen-rewrite/problems.md:58-82`; `issues.md` Task 30 portal asset gap.
+  Acceptance criteria: G1 full suite exit 0; G2 `check_rules.ps1` exit 0; G3 only if configure required after adding the test file; `mugen_sim_cli run-room 20002 --frames 60` stderr has no bind-miss for the por motion; new `*Portal*` (or unique filter) case fails if `base()` still writes a portal `motionFile`.
+  QA scenarios: Happy path: the cli stderr check + new test. Failure path: a Goods/Obstacle with a real `.motion` still samples boxes through `animate()`. Evidence: `task-41.md` including stderr excerpt.
+  Commit: Y | Client: `fix(sim): skip portal motion bind and keep radius collider`
+  Recommended task executor category: deep-low
+  Parent-verified 2026-10-10: Client commit `1a0c12073715c5b5722609772ad592b4f14f688e`. Parent re-ran `*Portal*` 6 cases / 88 assertions / 0 failed; `check_rules.ps1` EXIT=0; `mugen_sim_cli run-room 20002 --frames 60` EXIT=0 hash `6e1f372fe94ca5cc`; stderr has no `tx_ui_sizhongchuansongmen.motion` and no `MotionPlayer::bind: motion map not found`. Evidence: `task-41.md`.
+
+- [x] 42. Playtest: SpineBody durationMs assert after running (room 20002 mage)
+  What to do:
+  - User repro: after playing a while, Debug assert `clip.durationMs == static_cast<int>(std::lround(anim.duration() * 1000.0f))` at `Source/mugen/avatar/render/SpineBody.cpp:245`.
+  - Diagnose first (cite file:line): why `.motion` `MotionClip.durationMs` and the live Spine `Animation::duration()` diverge after time, not only at bind. Check looping wrap, `setMotion`/`seek`, shared skeleton, attachment/skin swap, timescale, clip concatenation, and float rounding. Architecture: logic and render bind the same `.motion` and duration is homologous — do NOT delete the assert to “fix” it.
+  - Fix the source of the mismatch so the equality holds for every clip the client actually plays in room 20002 / mage. If an authored clip duration is wrong, correct the clip or the seek path; if Spine duration is read at the wrong time (pre-skin), read it when the animation is the one being posed.
+  - Add a regression test if the mismatch is visible headless (clip vs parsed motion JSON). If it is render-only, add a client-side unit/smoke that walks every motion the mage uses and compares `durationMs` to `anim.duration()` after skeleton setup, and record a RelWithDebInfo run of `--offline-room=20002 --offline-role=mage --autotest-frames=900` that does not abort.
+  Must NOT do: remove or `#ifdef` away the assert; change combat sim numbers; generate portal `.motion` (todo 41); edit Server/Editor/UI/heiyue; worktree; push; mark F3 `[x]`.
+  Closes: F3 playtest crash.
+  Parallelization: W8 | Blocked by: 15 | Blocks: F3 | Can parallelize with: 41, 43, 44
+  References: `SpineBody.cpp` around 245; `avatar/data/MotionMap.h`; `AvatarPresenter`; contract §8.3 / §9 Avatar duration homology.
+  Acceptance criteria: G1 and G2 exit 0; G3 client build exit 0; RelWithDebInfo `--offline-room=20002 --offline-role=mage --autotest-frames=900` (cwd Content) exits 0 and does not hit the duration assert; evidence names the clip(s) that mismatched and the one-line root cause.
+  QA scenarios: Happy path: autotest 900 frames. Failure path: a unit case where a known clip's stored `durationMs` disagrees with Spine duration fails before the production assert. Evidence: `task-42.md`.
+  Commit: Y | Client: `fix(render): keep motion clip duration aligned with Spine animation`
+  Recommended task executor category: deep-low
+  Parent-verified 2026-10-10: Client commit `8d6588707c02433ef17d962a6dbcc51eb233147c`. Root cause: 11 mage clips (airmash/death/ground/...) have Spine duration 0 and box sample 33 ms; assert fires on first setMotion of those clips, not drift. Assert kept. Parent re-ran `*clip duration*,*stored duration*,*Duration*` 4 cases / 30 assertions / 0 failed; `check_rules.ps1` EXIT=0. Evidence: `task-42.md`.
+
+- [x] 43. Playtest: releasing direction keys must stop the hero
+  What to do:
+  - User repro: in `--offline-room=20002 --offline-role=mage`, pressing a direction key moves the matching way, but releasing the key does not stop.
+  - Diagnose first. Reference: `EntityRole:dealWithEvent` Idle on joystick release (`EntityRole.lua:2131-2187` via `Reference/heiyue-战斗逻辑.md` §5.1); `ControlManager.lua` key-up clears the axis. C++ must emit a release/idle control event (not keep the last CTR_JOY / walk vector). Do not retune todo 34 quadrant numbering (`ControlManagerCore::direction` and `Quadrant2Vector`).
+  - Fix the sticky axis: keyboard key-up must zero that axis; when both axes are zero, the ROLE tree must leave Walk/Run and enter Idle the same frame window as the reference (no coasting from a latched command).
+  - Headless: extend `ControlManagerTest` or add `LocomotionReleaseTest` that presses Right for N frames then releases (no buttons), then asserts Transform stops changing within 2 frames and status is Idle not Walk/Run.
+  Must NOT do: change quadrant mapping from todo 34; change WASD-to-move mapping; edit Server/Editor/UI FairyGUI; worktree; push; mark F3 `[x]`.
+  Closes: IS-1 walk operability (F3 playtest).
+  Parallelization: W8 | Blocked by: 14, 15, 34 | Blocks: F3 | Can parallelize with: 41, 42, 44
+  References: `Source/ui/battle` ControlManager; `sim/input`; `RoleTree` / `ActionWalk` / `ActionRun`; `ControlManagerTest.cpp`; `LocomotionTest.cpp`; todo 34.
+  Acceptance criteria: G1 filter `*Control*` and `*Locomotion*` plus the new release case exit 0; full G1 still green; G2 exit 0. The new case fails if key-up is ignored.
+  QA scenarios: Happy path: press then release stops. Failure path: holding the key continues to move. Evidence: `task-43.md`.
+  Commit: Y | Client: `fix(input): clear locomotion on direction key release`
+  Recommended task executor category: deep-low
+  Parent-verified 2026-10-11: Client commit `957cb0ab6533059f496ba26b354783876a1520ee`. Root cause: `updateDirection` returned on direction 0 without `CTR_IDLE`; ROLE tree kept last `CTR_RUN`. Fix emits `{CTR_IDLE,0,0,0}` on the edge to 0. Quadrant map unchanged. Parent re-ran `*Control*,*Locomotion*` 12 cases / 123 assertions / 0 failed; `check_rules.ps1` EXIT=0. Evidence: `task-43.md`.
+
+- [x] 44. Playtest: battle camera must follow the local player
+  What to do:
+  - User repro: in `--offline-room=20002 --offline-role=mage`, the camera does not follow the hero while walking.
+  - Diagnose first. Todo 15 required `CameraDirector` follow + `MapPresenter` (`LayerRuntimeLoader` + `VirtualCamera`). Find why the follow target is missing, stale, or never applied (wrong entity, world-space vs layer-space, follow disabled, camera updated before the player moves, offline boot skips director).
+  - Fix so the virtual camera tracks the local player's `Transform` every presented frame. Keep shake / slow-mo / action_camera as already implemented; do not invent a new camera rig. Match the existing presenter interpolation so the camera does not snap one logic frame behind in a broken way — following a moving walk is the acceptance, not cinematic polish.
+  - Headless if CameraDirector logic is engine-free: assert follow offset tracks a moving entity. If it is render-only, drive RelWithDebInfo `--offline-room=20002 --offline-role=mage --autotest-frames=300` and log camera center vs player position (add a Debug log or debug-panel value already present); evidence must show camera center moved with the player under injected movement, or a new presenter unit test that feeds two Transform samples and checks VirtualCamera look-at.
+  Must NOT do: rewrite the map renderer; change sim camera slow-mo numbers; worktree; push; mark F3 `[x]`; edit Server/Editor/heiyue.
+  Closes: IS-1 operability (camera follow).
+  Parallelization: W8 | Blocked by: 15 | Blocks: F3 | Can parallelize with: 41, 42, 43
+  References: `Source/mugen/render/battle` CameraDirector / WorldPresenter / MapPresenter; `render/VirtualCamera.*`; `ui/battle/LocalBattleMode.cpp`; contract §9.1.
+  Acceptance criteria: G3 client build exit 0; G1/G2 still green; evidence proves camera look-at/center changes when the local player Transform changes (test log or unit assertion), and does not stay at the spawn camera when the player has walked away.
+  QA scenarios: Happy path: player walks +x, camera center +x. Failure path: no local player → camera stays on the map default without crashing. Evidence: `task-44.md`.
+  Commit: Y | Client: `fix(render): follow local player with battle virtual camera`
+  Recommended task executor category: visual-engineering
+  Parent-verified 2026-10-11: Client commit `9f81c81e4e46451b686cd7626a0dd02ebd5bbfce` adds `WorldPresenter.h/.cpp`. Root cause: `VirtualCamera` defaulted `m_regionSize` to the viewport so `clampViewPosition` pinned view to 0; `setCall` moved only the `ParallaxNode`. Fix: `MapPresenter::load` calls `setRegion` from `LayerLoader` map size; camera callback moves map and `worldLayer` (avatars/hurt/debug) together; `CameraDirector::follow` sets focus from the local `Transform`; `present` calls follow every frame. Parent independently: `check_rules.ps1` EXIT=0; no `QA-TEMP` left in source; RelWithDebInfo exe 19962880 bytes 2026-10-11 01:32:40 (dirty-tree build). Evidence QA log: player x 950→1932, view -139→-1036. HEAD `LocalBattleMode.cpp` is still the todo-3 placeholder; `setFollowEntity(player)` lives in the uncommitted rewrite (todo 15 working tree), which is what the exe was built from. Evidence: `task-44.md`.
+
+- [x] 45. Playtest: stop Avatar motion-not-found spam on tx_youli_zidongsheji (room 20002 mage)
+  What to do:
+  - User repro (F3 2026-10-11): `--offline-room=20002 --offline-role=mage` no longer floods `tx_ui_sizhongchuansongmen.motion` bind (todo 41 done), but every logic frame prints `Avatar: motion 'N' not found in 'mugen/motion/effect/tx_youli_zidongsheji.motion'` for names `18`, `20`, `24`, `28`, `64`, `72`, `siwang`.
+  - Diagnose first (cite file:line). The log is Avatar, not `MotionPlayer::bind`. `problems.md` already recorded this file lists `{0,2,4,6,8,10,12,14,16,JN1}` — the names the skeleton actually has. Config/effect spawn requests absent names; regeneration cannot invent them.
+  - Ruling (do not reopen): do NOT generate `.motion`; do NOT pack `avatar.bin`; do NOT edit Tools; do NOT invent missing animation names or remap config ids without an authoritative source. This is a config/skeleton mismatch, not a missing asset.
+  - Code: stop the per-frame flood. Log each distinct `(motionFile, motionName)` miss at most once (English). Analog: `MotionPlayer::bind` file-scope `std::set<std::string>` de-dupe from todo 41 (not battle state, not `unordered_set`). If `AvatarPresenter::present` / `setMotion` re-enters the miss path every frame, skip the repeated lookup after the first miss so the warning cannot return. Empty name: no log.
+  - Tests: if the miss is reachable headless, add a case that looks up a known-absent name twice on this motion and asserts the English warning appears once. If it is render-only, add a client-side unit/smoke on the same once-per-key contract and record RelWithDebInfo `--offline-room=20002 --offline-role=mage --autotest-frames=300` stderr: after the first miss for a given name, that exact `Avatar: motion 'N' not found` line must not repeat every frame. Evidence: `.omo/evidence/mugen-rewrite/task-45.md`.
+  Must NOT do: generate `.motion`; pack avatar.bin; edit Tools/Server/Editor/UI/heiyue; change combat sim numbers; retune locomotion; edit plan checkboxes; worktree; push; mark F3 `[x]`.
+  Closes: F3 playtest gap (Avatar motion log spam).
+  Parallelization: W9 | Blocked by: 15 | Blocks: F3 | Can parallelize with: 46
+  References: `avatar/render` Avatar / AvatarPresenter; `MotionPlayer.cpp` bind once-log; `.omo/notepads/mugen-rewrite/problems.md:58-82`; todo 41 analog.
+  Acceptance criteria: G1 full suite exit 0; G2 `check_rules.ps1` exit 0; G3 only if a client unit is added; stderr of a 20002 mage autotest (or the new unit) does not flood the same `tx_youli_zidongsheji` miss every frame. The new case fails if the miss path logs on every call.
+  QA scenarios: Happy path: first miss logs once, later frames stay quiet for that name. Failure path: a name that EXISTS in the motion file still plays. Evidence: `task-45.md` including a stderr excerpt or unit assertion.
+  Commit: Y | Client: `fix(render): log missing Avatar motions once`
+  Recommended task executor category: unspecified-high (deep-low quota exhausted)
+  Parent-verified 2026-10-11: Client commit `45dd47e54ab6d3de55a20647557704f90d871a47` (`fix(render): log missing Avatar motions once`). Four files: `MissingAvatarMotion.h/.cpp`, `Avatar.cpp` `setMotion` -> `findAvatarMotion`, `MissingAvatarMotionTest.cpp`. File-scope `std::set<std::string>` keyed by `motionFile + '\n' + motionName`; empty name no log; present names still resolve. Parent independently: `*Missing avatar motion*` 3/14/0; full G1 245/245364/0 EXIT=0; G2 EXIT=0. Evidence `task-45.md`. F3 stays `[~]`. LocalBattleMode not committed. No `.motion` generated.
+
+- [x] 46. Playtest: dual-axis diagonal plus opposing-key last-wins (room 20002 mage)
+  What to do:
+  - User repro (F3 2026-10-11): `--offline-room=20002 --offline-role=mage`. Todo 43 already stops on full release. Remaining: (a) Up+Right moves on only one axis, not diagonal. (b) Left then Right must move right while both are held. (c) Releasing Right while Left is still held must move left with no Idle gap.
+  - Root cause (verified, do not re-litigate): `ControlManagerCore.cpp` `direction()` encodes four bools into ONE quadrant; Right/Left are checked before Down/Up, so Up+Right stays `1` and `updateDirection` returns because `current == m_lastDirection`. Angle is hardcoded `0` or `90000`. Left+Right fails both XOR arms and returns `0` → `CTR_IDLE`. `m_held` has no press recency. ROLE Walk/Run (`RoleTree.cpp` tick) already writes both `vectorX` and `vectorZ` when `angle==45000` via `cosDeg`/`sinDeg`; ControlManager never emits that angle. Combos (`kCombos`) stay 4-way quantized on the 90° sector.
+  - Code:
+    - `ControlManagerCore`: track per-axis press recency in `setKey(pressed=true)` (counter or timestamp owned by the manager instance — not a process-wide static, not `unordered_map`). When Left+Right (or Up+Down) are both held, the later key wins that axis. Releasing the later key falls back to the remaining held key in the same `updateDirection` edge; do NOT emit `CTR_IDLE` while any axis is still held.
+    - Perpendicular keys (Up+Right, Up+Left, Down+Right, Down+Left): emit `{CTR_RUN, quadrant, 45000, 1}` where `quadrant` is still the 90° sector (Up+Right → 1). Re-emit when the *angle* changes even if the quadrant stays the same (Right held, then Up: 0° → 45°). `m_lastDirection` alone is not enough — also remember the last emitted angle.
+    - Combo matching continues to use the 4-way sector code (1/2/3/4), never a fifth diagonal code. Keep todo 34 numbering: Right=1, Down=2, Left=3, Up=4. Do not change WASD mapping (client movement is arrow keys in `GameView.cpp`).
+    - Do not retune `RoleTree.cpp` vector signs unless a new 45° case actually fails; the tick already supports 45°. Same for `ActionAttack.cpp` / `Effect.cpp` unless they ignore non-cardinal angles.
+  - Tests (globbed; titles must match `*Control*` or `*Locomotion*` so existing filters see them):
+    - Up+Right for N frames: Transform Δx>0 AND Δz>0 (role 104 / mage velocity, not role 261 velocity=0).
+    - Left then Right while both held: moves +X, not idle.
+    - Release Right, Left still held: moves −X within 2 frames, no Idle coast in between.
+    - Existing single-key LocomotionTest quadrants and LocomotionReleaseTest Right-release still pass. Combo Down-Left-Up-Right-Down still emits JOY as today.
+  - Evidence: `.omo/evidence/mugen-rewrite/task-46.md`.
+  Must NOT do: change quadrant numbering from todo 34; change WASD-to-move mapping; add a fifth combo code; edit Server/Editor/UI/heiyue; worktree; push; mark F3 `[x]`; edit plan checkboxes.
+  Closes: IS-1 walk operability (diagonal + opposing last-wins).
+  Parallelization: W9 | Blocked by: 34, 43 | Blocks: F3 | Can parallelize with: 45
+  References: `ControlManagerCore.cpp:27-42,94-118`; `ControlManagerCore.h` `m_held` / `m_lastDirection`; `RoleTree.cpp` tick ~176-189; `LocomotionTest.cpp`; `LocomotionReleaseTest.cpp`; todo 34; todo 43.
+  Acceptance criteria: G1 filter `*Control*,*Locomotion*` plus the new dual-axis/last-wins cases exit 0; full G1 still green; G2 exit 0. The new diagonal case fails if `direction()` still returns a single axis for Up+Right. The new last-wins case fails if Left+Right emits `CTR_IDLE`.
+  QA scenarios: Happy path: Up+Right walks diagonally; Left then Right walks right; release Right walks left. Failure path: releasing all keys still Idle (todo 43). Evidence: `task-46.md`.
+  Commit: Y | Client: `fix(input): diagonal locomotion and opposing-key last-wins`
+  Recommended task executor category: unspecified-high (deep-low quota exhausted)
+  Parent-verified 2026-10-11: Client commit `8036f64299835e2cd85a495eb253a8fc7f3170fd` (`fix(input): diagonal locomotion and opposing-key last-wins`). Four files: `ControlManagerCore.cpp/.h`, `ControlManagerTest.cpp`, `LocomotionReleaseTest.cpp`. Instance `m_pressOrder[4]`/`m_pressSerial`; `axisSign` later stamp wins one axis; perpendicular keys emit `{CTR_RUN, sector, 45000, 1}` (Up+Right=1); `m_lastAngle` re-emits when Right is held and Up is added (quadrant stays 1, angle 0→45000); combo advances only on sector change, still codes 1/2/3/4; `CTR_IDLE` only when both axes resolve to 0 (todo 43). Quadrant numbering unchanged. RoleTree vector signs not retuned. WASD unused. Parent independently: `*Control*,*Locomotion*` 20/156/0 FILTER_EXIT=0; full G1 253/245397/0 EXIT=0; G2 EXIT=0; clangd `ControlManagerCore.cpp` clean. Evidence `task-46.md`. F3 stays `[~]`. LocalBattleMode not committed.
+
 ## Final verification wave
 > Runs in parallel after ALL todos. ALL must APPROVE. Surface results and wait for the user's explicit okay before declaring complete.
-- [ ] F1. Plan compliance audit
+- [x] F1. Plan compliance audit
   - Re-run the acceptance commands of every todo and gates G1–G5.
   - Each GAP row has a todo that closes it.
   - Combat data references: `kUnimplementedLeaf` = 0 and `kUnportedRule` = 0.
   - The "Must NOT have" items all hold (check with `git diff --stat` that the Server/Editor/UI/heiyue repos are untouched).
-- [ ] F2. Code quality review
+  Parent-verified 2026-10-09: G1 log 225/245170/0 failed; G2 independently re-run exit 0; G5 Release hashes match RelWithDebInfo pair (2010101 `6231c7ecb324ea6f`, 2071501 `ffb825e92024d73d`, 30002 `3325585ada0f3232`); placeholders only enum/sentinel; Server/Editor/UI/heiyue diffs empty. Evidence: `F1-plan-compliance.md` (stale after 41-44).
+  Parent-verified 2026-10-11 after 41-44 (`ses_ed9082e09ffeeEr8Hp91SFZ1l4`, evidence `F1-plan-compliance-after-41-44.md`, literal `VERDICT: APPROVE`). Parent independently: `kUnimplementedLeaf` only `RoleTree.h:89` enum; `kUnportedRule` only `BuffRules.cpp` sentinel/fill/`isUnportedRule`; G5 log pairs 30002 `1dc3eecaca364898` and 20002 mage `bc37c5a5d6618b1e` twice each EXIT=0; notepad `F1-rerun-after-41-44` entries present. Dirty-tree G1 242/245350/0; G2 EXIT=0; G3 not rebuilt (exe 19962880 bytes 2026-10-11 01:32:40 vs commit `9f81c81` 01:34:21). RelWithDebInfo does not prove todo 42. F3 stays `[~]`.
+  Parent-verified APPROVE 2026-10-11 after 45-46 (`ses_ed6e148d9ffesyT2hD062zDIAd`, evidence `F1-plan-compliance-after-45-46.md`, literal `VERDICT: APPROVE`) on Client HEAD `8036f64299835e2cd85a495eb253a8fc7f3170fd`. Parent independently: G1 253/245397/0 EXIT=0; G2 EXIT=0; `*Control*,*Locomotion*` 20/156/0; `*Missing avatar motion*` 3/14/0. Worker live G1/G2 matched those counts. HEAD `kUnimplementedLeaf` only `AGENTS.md:50`; `kUnportedRule` no HEAD hits. Server/Editor/UI/heiyue product diffs empty. RelWithDebInfo 01:32:40 and `mugen_sim_cli` 2026-10-10 22:58:19 are pre-45/46; client G5 deferred to F3-machine. F3 stays `[~]`.
+- [x] F2. Code quality review
   - An independent reviewer reads the diff on the `mugen-rewrite` branch of Client/Tools/Config against its base and checks compliance with contract §0.4 (no floats, no unordered containers, no std::function, no engine headers, no defensive null checks, English logs, no product names).
   - Checks there is no dead code, no duplicated logic, and that every placeholder has been removed.
-- [ ] F3. Real manual QA
+  Parent-verified APPROVE 2026-10-10 on committed HEAD `c2925b4` (`ses_edb0f62c7ffegAgyBNAOO5kMD0`, evidence `F2-code-quality-rereview-c2925b4.md`, literal `VERDICT: APPROVE`). Parent independently re-ran `git archive HEAD` then `check_rules.ps1 -Paths core,sim` ARCHIVE_EXIT=0; Object.h/Vec2.h/Vec3.h absent from `git ls-tree HEAD`; `git grep HEAD \\bthrow\\b` only five consteval Fixed.h; unordered empty under core/sim; DeferredDeterminismPaths gone. Prior REJECTs retained: `F2-code-quality.md` (2026-10-09, closed by todo 39 `d7542d2`) and `F2-code-quality-rereview.md` (2026-10-10, closed by todo 40 `c2925b4`). Non-blocking notes: HEAD `conf/Config.h` still derives from deleted Object (outside core/sim, dirty-tree rewrite); stale BuffRules.cpp:818 comment; unused `kUnimplementedLeaf` enum; SkillPool/AttackRole vs SkillManager naming is a user-rule vs AGENTS.md direction question, not a §0.4 fail.
+  Parent-verified APPROVE 2026-10-11 after 41-44 (`ses_ed8eba63fffevX2l574sjwLokc`, evidence `F2-code-quality-after-41-44.md`, literal `VERDICT: APPROVE`) on Client HEAD `9f81c81e4e46451b686cd7626a0dd02ebd5bbfce`. Parent independently: `RoleTree.h`/`BuffRules.cpp` exist on disk but not in HEAD (cat-file EXIT=128); `kUnimplementedLeaf` on HEAD only `AGENTS.md:50`; `kUnportedRule` no HEAD hits; `CTR_IDLE` in committed `ControlManagerCore.cpp`; notepad `F2-rerun-after-41-44` present. Archive `check_rules -Paths core,sim` ARCHIVE_EXIT=0. Tools/Config were not in 41-44. F3 stays `[~]`.
+  Parent-verified APPROVE 2026-10-11 after 45-46 (`ses_ed6d65782ffeJOhZcVpurzDWmj`, evidence `F2-code-quality-after-45-46.md`, literal `VERDICT: APPROVE`) on Client HEAD `8036f64299835e2cd85a495eb253a8fc7f3170fd`. Parent independently: `9f81c81..HEAD` is 8 files +438/-33 (`45dd47e` + `8036f64`); `kUnimplementedLeaf` HEAD only `AGENTS.md:50`; `kUnportedRule` no HEAD hits; unordered empty under core/sim; `\bthrow\b` only five consteval `Fixed.h`; `ControlManagerCore.h` absent at `9f81c81` (EXIT=128) and present on HEAD; `RoleTree.h` not in HEAD (EXIT=128). Worker archive `check_rules -Paths core,sim` ARCHIVE_EXIT=0. Recency is instance `m_pressOrder`/`m_pressSerial`; missing-motion de-dupe is file-scope `std::set` in avatar/. Tools/Config were not in 45-46. F3 stays `[~]`.
+- [~] F3. Real manual QA
   - Run `--offline-room` + `--autotest-frames` on 3 rooms; both runs must give the same hash.
   - Organize M1–M6.md into a final manual acceptance checklist for the user. Once the user has played through it in person (`run.bat Release`), they give an explicit okay.
-- [ ] F4. Ideal-state fidelity
+  Machine gate parent-verified 2026-10-09: six 900-frame hashes match (RelWithDebInfo at 19:15, Release at 19:20–23). That table is stale after 41-44.
+  Machine gate parent-verified 2026-10-11 after 41-44 (`ses_ed8bb867affeRiRaIoBuMm4Kq7`, evidence `F3-manual-qa-after-41-44.md` last line `MACHINE_GATE: PASS`, log `F3-g5-after-41-44.txt`). RelWithDebInfo exe 19962880 bytes, 2026-10-11 01:32:40, dirty-tree build. Six sequential 900-frame pairs on cwd Content, all EXIT=0: 2010101 `040cd83ac5ba9b55`, 2071501 `ffb825e92024d73d` (unchanged vs 10-09), 30002 `1dc3eecaca364898` (matches F1). 2010101 moved from `6231c7ecb324ea6f`; 30002 moved from `3325585ada0f3232`. 20002 mage 300-frame pair cited from F1: `bc37c5a5d6618b1e`. `M-FINAL.md` refreshed (exe stamp, section 5b unchecked W8 items, section 6 new hashes). RelWithDebInfo is NDEBUG and does not prove todo 42. BLOCKED on fangcheng play-through of `M-FINAL.md`. Start interactive play with `cd AxmolFighter-Client; run.bat RelWithDebInfo`. Offline: from `AxmolFighter-Client\Content` launch `--offline-room=20002 --offline-role=mage` (also 30002|2010101|2071501).    Do not mark `[x]` until todos 41-46 are `[x]` AND fangcheng checks the M-FINAL items (including room 20002 mage: no por bind spam, no SpineBody duration assert, key-release stops, camera follows, no Avatar motion-miss flood, Up+Right diagonal, opposing last-wins then fallback) and says an explicit okay.
+  Machine gate parent-verified 2026-10-11 after 45-46 (`ses_ed69b642ffferz12tQqFezoLly`, evidence `F3-manual-qa-after-45-46.md` last line `MACHINE_GATE: PASS`, log `F3-g5-after-45-46.txt`). Parent independently: RelWithDebInfo exe 19968512 bytes, LastWriteTime 2026-10-11 13:23:39 (after `8036f64` 11:45:21); Client HEAD `8036f64299835e2cd85a495eb253a8fc7f3170fd`; `LocalBattleMode.cpp` still dirty/unstaged. Eight sequential cwd-Content pairs all EXIT=0: 2010101 `040cd83ac5ba9b55`, 2071501 `ffb825e92024d73d`, 30002 `1dc3eecaca364898`, 20002 mage 300 `bc37c5a5d6618b1e` (unchanged vs 41-44; empty autotest input can keep the hash after todo 46). Transcript Avatar miss lines are once per `(file, name)` not a flood. RelWithDebInfo is NDEBUG and does not prove todo 42. `M-FINAL.md` section 0/6 refreshed; section 5b/7 stay unchecked. F3 stays `[~]`.
+- [x] F4. Ideal-state fidelity
   - Compare against the IS-1..IS-8 rows one by one. Each row needs a passing scenario test and evidence.
   - Any shortfall becomes a new `- [ ] N.` todo, not a note.
+  Parent-verified APPROVE 2026-10-09 after 35-38. Original REJECT (`ses_edfa371f1ffeId7C1Y4Vh50ckl`, `F4-ideal-state.md`) named four IS-1 gaps; those todos are now `[x]` with parent-rerun filters: sprint `f4182a0` `*Sprint*` 4/33 via `dealButtonEvent`; dodge `10c4e52` `*Dodge*` 2/33 slot F DODGE; crazy `e40a850` `*Crazy*` 2/24 BuffCrazy then `A+`; SkillButton `f359f9a` `*SkillButton*` 4/69 ATKB/C/D + JOY1 through `dealWithButton`. IS-2..IS-8 unchanged PASS. Independent of todo 39. Independent-reviewer re-dispatch skipped: executor quota exhausted.
+  Parent-verified APPROVE 2026-10-11 after 41-44 (`ses_ed8dd3d95ffe2TVYYLp0L4Kul3`, evidence `F4-ideal-state-after-41-44.md`, literal `VERDICT: APPROVE`). Parent independently: `MotionClipDurationTest.cpp` has three `TEST_CASE`s matching the live `*clip duration*,*stored duration*` 3/9/0 (assignment text 4/30 was wrong; `task-42.md` already recorded 3/9); filter log `F4-rerun-after-41-44-filters.log` Sprint 4/33, Dodge 2/33, Crazy 2/24, SkillButton 4/69, locomotion 12/123, Portal 6/88, Determinism 4/5096, all EXIT=0; camera from `task-44.md` player x 950→1932 / view -139→-1036 plus F1 G5 `bc37c5a5d6618b1e`. No new `- [ ]` todos. F3 stays `[~]`.
+  Parent-verified APPROVE 2026-10-11 after 45-46 (`ses_ed6b57bbbffeBdXH3ibrBWYMTL`, evidence `F4-ideal-state-after-45-46.md`, literal `VERDICT: APPROVE`) on Client HEAD `8036f64299835e2cd85a495eb253a8fc7f3170fd`. Parent independently: filter log `F4-rerun-after-45-46-filters.log` Sprint 4/33, Dodge 2/33, Crazy 2/24, SkillButton 4/69, locomotion 20/156 (was 12/123), Portal 6/88, clip 3/9, Determinism 4/5096, Missing-avatar 3/14, all EXIT=0. IS-1 includes todo 46; IS-8 includes todo 45. Camera still `task-44.md`. RelWithDebInfo 01:32:40 is pre-45/46 and is not this proof. No new `- [ ]` todos. F3 stays `[~]`.
 
 ## Commit strategy
 - One commit or more per todo, split by subrepo: `AxmolFighter-Client`, `AxmolFighter-Client/Content` (config.bin/avatar.bin), `AxmolFighter-Tools`, `AxmolFighter-Config`, all on the `mugen-rewrite` branch.
@@ -1154,11 +1370,11 @@ Your next move: run `/ulw-execute mugen-rewrite` in OpenCode. Whenever a milesto
 
 | IS | Delivering todo(s) | Proving QA scenario | Evidence |
 | --- | --- | --- | --- |
-| IS-1 | 14, 15, 17, 18, 19, 20 | `*Skill*`, `*AttackTree*`, `*AttackRole*`, `*Effect*` + M2 manual check | task-17..20, M2.md |
+| IS-1 | 14, 15, 17, 18, 19, 20, 35, 36, 37, 38, 43, 44, 46 | `*Skill*`, `*AttackTree*`, `*AttackRole*`, `*Effect*`, `*Sprint*`, `*Dodge*`, `*Crazy*`, `*SkillButton*`, locomotion release + camera follow + diagonal last-wins + M2 manual check | task-17..20, task-35..38, task-43, task-44, task-46, M2.md |
 | IS-2 | 28 | `*Ai*` scenarios + M5 manual check | task-28, M5.md |
 | IS-3 | 21, 22, 23, 24, 25, 26, 27 | damage golden test, `*HitState*`, `*Buff*`, `*Ability*` | task-21..27, M3.md, M4.md |
-| IS-4 | 29, 30 | `*Room*`, full-run scenario | task-29, task-30, M6.md |
+| IS-4 | 29, 30, 41 | `*Room*`, portal bind-skip + full-run scenario | task-29, task-30, task-41, M6.md |
 | IS-5 | 4, 5, 6, 7, 12, 31 | `*Determinism*`, snapshot/clone tests | task-31 |
 | IS-6 | 8, 9, 10, 11 | converter selftest, pack report, failure path with a bad table | task-8..11 |
 | IS-7 | 16 | `TownPuppetTest` + M1 manual check | task-16, M1.md |
-| IS-8 | 2, 3, 12, 15 | headless tests, check_rules, offline autotest | task-2, task-3, task-15 |
+| IS-8 | 2, 3, 12, 15, 45 | headless tests, check_rules, offline autotest, Avatar motion-miss once-log | task-2, task-3, task-15, task-45 |

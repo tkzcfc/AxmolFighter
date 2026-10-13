@@ -31,7 +31,7 @@ The Axmol engine is not in the repo. It needs `AX_ROOT` and the `axmol` CLI from
 ## Cross-cutting pipelines
 - **Config:** edit `AxmolFighter-Config/table/*.lua`, run `AxmolFighter-Tools/config_converter/run_config_converter.ps1`, and the output is `Client/Content/mugen/config/config.bin`.
 - **Protocol:** edit `Server/game/protocol/pb/*.proto`, then run `Tools/protoc/run_proto_gen.ps1`. It generates code into `Client/Source/net/` and `Server/battle/src/protocol/`.
-- **Rebuild both:** after changing `mugen`, protocol or config, rebuild the client **and** the battle server.
+- **Rebuild both:** after changing `mugen`, protocol or config, rebuild the client **and** the battle server (note: the battle server currently does not compile and is waiting on a rewrite).
 
 ## Reference docs (`Reference/`, Chinese UTF-8)
 | Doc | Contents |

@@ -9,7 +9,7 @@ AxmolFighter/
 ├── AxmolFighter-Client/          # C++ 客户端（Axmol 引擎 + CMake）
 │   └── Source/
 │       ├── AppDelegate.cpp / MainScene.cpp   # 入口
-│       ├── 3rd/     # protobuf-lite、tinyexpr、behaviac 3.6.39（尚未接入编译）
+│       ├── 3rd/     # protobuf-lite、behaviac 3.6.39（尚未接入编译）、spine 3.4
 │       ├── net/     # protobuf-lite 生成代码和客户端网络层（yasio）
 │       ├── mugen/   # 自研战斗/动作逻辑，battle 复用（见下）
 │       ├── ui/      # FairyGUI UI
@@ -19,7 +19,7 @@ AxmolFighter/
 ├── AxmolFighter-Server/
 │   ├── game/        # Rust workspace：gateway / game / town / protocol / backend-framework
 │   └── battle/      # C++ 战斗服（复用客户端 mugen）
-├── AxmolFighter-Tools/           # 协议生成、配置转换、sol 绑定、spine 导出等工具
+├── AxmolFighter-Tools/           # 协议生成、配置转换、Spine 导出等工具
 ├── AxmolFighter-UI/              # FairyGUI 工程
 ├── AxmolFighter-Editor/          # 场景/资源编辑器
 ├── Reference/                    # 参照工程（黑月）对照文档
@@ -38,32 +38,39 @@ AxmolFighter/
 
 | 子目录 | 职责 |
 |--------|------|
-| `conf/` | `TableConfig.h`（配置结构体）+ `Config.h/cpp`（config.bin 加载） |
-| `bt/` | 行为树对象图：`RoleTreeBuilder` / `SkillTreeBuilder` / `EffectTreeBuilder`，见其 README |
-| `skill/` | `Skill` / `SkillManager` 施法对象图 |
-| `buff/` | `Buff` / `BuffManager` 对象图 |
-| `ai/` | `AiAgent` / `SkillAi` AI 对象图 |
-| `effect/` | `Effect` 特效对象图 |
-| `avatar/` | 角色表现：逻辑侧（`MotionPlayer`、外观解析）在根目录，渲染侧（`Avatar`/`SpineBody`/`AvatarAccessory`）在 `render/`（`#ifdef RUNTIME_IN_AXMOL`） |
-| 组件 | ECS 组件在 `component/`、系统在 `system/`、动作叶子在 `bt/actions` |
+| `core/` | 数学、反射、序列化、ECS、行为树内核。不依赖引擎 |
+| `conf/` | 配置结构体、`Config` 加载、职业 id 换算（`TypeConversions`） |
+| `avatar/` | 角色表现：逻辑侧（`MotionPlayer`、外观解析、`AvatarPaths`）在根目录，渲染侧在 `avatar/render/` |
+| `render/` | 仅客户端：Spine 后端、`LayerRuntimeLoader`、`VirtualCamera` |
+| `sim/` | 战斗逻辑（重写中）：`World` tick 管线、ECS 组件/单例登记、帧输入与表现事件、`.mgrp` 回放与 `mugen_sim_cli`；`ability/` 是组件化特殊能力池，按技能、命中、Buff 和角色生命周期事件稳定分派 | 
 
-### 系统顺序
+旧玩法层（对象图式技能/Buff/AI/特效、联网战斗）已删除，战斗由 `sim/` 重建。`sim/` 目前实现完整的单人战斗：`World::tick` 按固定顺序推进（时钟 → 逻辑定时器 → 控制事件 → 相机/慢放 → 实体组 Role/Effect/Obstacle/Goods/Portal → 场景 → 碰撞 → `flushDestroyed`）；组件与单例登记表在 `sim/Components.h` / `sim/Singletons.h`；帧输入由 `FrameInput` / `PlayerCommand` / 系统命令 / puppet 更新组成；`PresentationEvent` 队列承载表现层事件，`LogicTimers` 提供逻辑定时器。`sim/Replay` 定义 `.mgrp` 回放格式，配套 `mugen_sim_cli`（`replay` / `run-room` / `record-room` / `--compare`）与测试侧 `TestsHeadless/support/ScenarioHarness` 无头驱动。
 
-`PhysicsSystem` → `AISystem` → `CombatSystem` → `BehaviorTreeSystem` → `DisplacementSystem`
+`core/bt` 已拆成共享定义与值实例：`BTDef<Param>` 保存只读 DFS 节点、条件和参数池，派生直接子节点索引表（`firstChild` 指向该表）与紧凑叶状态索引；`BTInstance<LeafState>` 通过 `MG_REFLECT` 保存节点状态、int16 游标、Parallel 运行集、条件状态和叶状态。`BTRunner<Context, Param, LeafState>` 是瞬时执行视图，`BTRegistry` 仅存函数指针。Context/参数/叶状态由 sim 定义；当前仅 `TestsHeadless/tests/BTTestTypes.h` 提供测试 variant。`std::monostate` 在归档中为零字节载荷，variant 仍写 u8 标签。
 
-战斗驱动唯一路径是 `BehaviorTreeSystem`；树由 Builder 按卡组重建，快照只存节点标量（DFS），恢复时按 `typeName` 回填。
+组件快照只保存定义 key + instance；`BTDefCache<Key, Param, Config>` 用不可变配置和构建函数按 key 重建拓扑，缓存须比 runner 活得久。Selector 不抢占，成功后环形尝试其他兄弟；Sequence 忽略子节点 Failure；组合节点运行期间守卫失效返回 Success。退出先处理运行子节点，再将父游标/状态复位，最后逆序退出运行条件。Parallel 的 update 永不 Failure，但 enter 在守卫拒绝或无子节点可进入时返回 Failure。根停止只记一次错误，不自动重启。空 Sequence 在定义构造时拒绝。
+
+`core/ecs` 已改为数据 ECS：`Entity` 是低 20 位 index、高 12 位 generation 的句柄，0 无效。`ECSManager<ComponentTuple, SingletonTuple>` 按登记顺序固定类型 id，以 sparse/dense 数组保存可拷贝的反射组件，tuple 保存单例。当前登记表仅在 `TestsHeadless/tests/EcsTestTypes.h`，生产 `sim/Components.h` / `Singletons.h` 在 World 阶段接入；核心不依赖测试头文件。
+
+`destroy` 只标记，实体到 `flushDestroyed` 才失效；按销毁请求顺序进入 FIFO 空闲表，存活列表稳定压缩，generation 用尽的 slot 永久退役。`each<Ts...>(fn)` 按创建顺序、调用开始时的固定上界遍历，回调参数是 `(Entity, Ts&...)`。遍历中可创建/标记销毁，禁止 flush；组件池增删后须重新 `get/tryGet`，不能继续使用可能已失效的引用。快照包含 slot（含待销毁次序及下一创建序号）、创建顺序、FIFO、按类型 id 排列的组件池和单例；反序列化只接受从未分配 slot 的空 manager，失败不写入目标。`clone` 深拷贝，`hash` 对快照字节使用 xxh64。System 仅保留 `update(sim::World&)` 接口。
+
+`sim/ai/DecisionTree` 是独立于 ROLE 动作树的决策层：C++ 手工构建 Entity 拓扑、函数指针分派 `AiAgent` 方法，反射组件保存警戒状态、运行调用栈、十秒仇恨计时及按首次命中排序的伤害记录。不链接 behaviac；Enter 守卫只在进入时检查，custom 中止条件只在 Sequence 子节点分派点检查，Running 叶子直接恢复。角色更新在控制输入和 ROLE 树前执行怪物 AI；目标与技能间隔复用 SkillPool，普通槽走 SkillAi，X/Z 槽不走自动施放条件。嘲讽读取 `buff::sneerTarget` 并覆盖目标。`MovementLeaves` 将巡逻、追击和警戒接入 ROLE 树，共享 ActionMove 状态；决策按 X、Z 顺序抽取偏移，叶子进入后抽取停留时长，全部使用本场 RngState。死亡目标重选，无目标的 NoAlert 角色巡逻，已经 Alert 的角色不重置警戒。自动战斗、走向传送门不在此实现范围。
 
 ## 配置流水线
+`sim/room/RoomEntities` 装配战斗房间的门、障碍和物品：门采用 Close/Active/Transfer 三阶段，Fight_End 开放 Room 类型门；碰撞请求延迟到帧尾调用 `World::changeRoom`，保留玩家与 `isPassRoom` 角色句柄和池状态。门位置读取已转换的 `portalPosX/Z`，不依赖已删除的地图实体槽节点。障碍按受击次数销毁，死亡掉落由 HitHooks 接入，物品抛射完成后可拾取并施加 Buff。特效按 summonFrame 创建角色，出生前建立归属并继承属性；寿命按逻辑毫秒推进，标准伤害递归读取主人。Finding 已接入单目标点走跑叶子。网络 Stage/Camp 传送和宠物不在该实现中。
+
+`sim/room/RoomFlow` 在创建主控角色后显式启用，房间配置、状态队列、30ms 转换等待、波次和复活预算保存在 `RoomState`。场景阶段处理清场、Clear/Defense/Survive 和胜负事件；Defense 的 2 秒倒计时由 `LogicTimers` 驱动。非普通清场房的首领全部死亡时启动 `SlowMotion` 中的 `KoSlowMotion`，按未缩放固定秒数推进降速、保持、恢复三段曲线。复活和返回城镇通过 `FrameInput.systemCommands`；客户端先消费帧结果，再切换城镇视图。房间提示与胜负只发出表现事件，不调用结算网络或自动传送。
 
 1. 源表在参照工程 `heiyue/src/imports/table`。
-2. `AxmolFighter-Config/table/*.lua` 是转换后的扁平表（`HACKER_DATA_INIT` 格式）。
-3. 打包工具把 Lua 表转成 C++ 结构体并序列化为 `AxmolFighter-Client/Content/mugen/config/config.bin`：
+2. `AxmolFighter-Config/table/*.lua` 是转换后的扁平表。
+3. 纯 C++ 打包工具 `config_converter` 用 `conf/ConfigTables.h` 的 `MG_CONFIG_TABLES` 注册反射结构，严格读取全部 42 种 Lua 表并序列化为 `AxmolFighter-Client/Content/mugen/config/config.bin`。C++ 结构体字段必须与 Lua 表一一对应；多余字段、缺失字段、类型错误、非整数写入整数字段和重复 id 会在一次检查中汇总报告。Import 按每种表的字段并集只补齐缺失键；equip/fashion 按 `(id, occupation)` 排序去重检查，五种 ordinal 音效表保留行序。文件头为 `MGCF + version + schemaHash`，运行时 schema 不匹配会拒绝加载。客户端统一使用 `conf/ReflectedConfig.h` 的 `mugen::conf::Config::instance()`，加载接口为 `load/loaded`；`find<T>/get<T>` 按登记策略接受 id、`{id, occupation}` 或从 1 开始的 ordinal，`findById/getById` 仅用于 KeyById 表。引用链使用可空 find，时装职业由角色 id 推导，职业行缺失时再查 occupation=0 的公共行：
 
 ```powershell
 powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --skip-configure
 ```
 
-C++ 结构体字段必须与 Lua 表一一对应；Lua 没有的字段一律不进结构体，运行时需要的信息从已有列推导。打包脚本内置 smoke 校验。
+工具还提供 `scaffold <ConfigDir> <kind>`、`verify <ContentDir>` 与 `selftest` 子命令。`pack-avatar <ContentDir>` 扫描 Content（包括 `res_zhcn`）下的 `.box` / `.motion` 并写入 `Content/mugen/config/avatar.bin`；文件头为 `MGAV + version + schemaHash`，运行时 schema 不匹配会记录错误并拒绝加载。`spine-box` 和 `spine-box-list` 是 C++ Spine 碰撞框导出子命令。
+数值超出目标整数或 Q44.20 Fixed 范围时，LuaReader 饱和到该类型边界；每种受影响表告警一次，并逐条输出原值与存储值。小数写入整数仍失败。`MG_CONFIG_REFS` 的全部引用边输出悬空数量与前五个样例，包括战斗链在内均只告警，不修改源 id；运行时遍历这些引用必须使用可空 `find`。
 
 ## 网络与服务架构
 
@@ -112,7 +119,7 @@ C++ 结构体字段必须与 Lua 表一一对应；Lua 没有的字段一律不�
 - 帧动画（纸娃娃）资源的接入方式：离线转换为 spine（每部位一个 slot，attachment 时间轴 + drawOrder；每个部位的区域名一致的 atlas），直接复用 atlas 换装；`AniData`/`MotionEntryType::kAni` 仅保留数据类型，运行时不使用。
 - Spine 数据归属在创建时确定（`MgSkeletonData::isExclusive`），不从 `use_count` 推断；共享缓存 key 为骨架 + 规范化 atlas 列表 + scale，切换 View 后 `purgeUnused`。
 - 逻辑文件放 `mugen/avatar/` 根目录（禁止 include axmol/spine）；渲染文件放 `render/` 并整体 `#ifdef RUNTIME_IN_AXMOL`（battle CMake 自动排除）。
-- 状态机经 `AvatarComponent::play` 驱动 `MotionPlayer`；渲染 `Avatar` 由 `AvatarRenderSystem` 跟随（动作变化时 setMotion + seek，漂移超过阈值时 seek 校正）。
+- 状态机经 `AvatarComponent::play` 驱动 `MotionPlayer`；渲染 `Avatar` 由 `AvatarPresenter` 跟随（动作变化时 setMotion + seek，漂移超过阈值时 seek 校正）。`MotionState` 是可序列化的播放标量，包含 `.motion` 路径、播放位置和速度。
 
 ## 资源加载器（Source/resource, 命名空间 gameres）
 
@@ -123,8 +130,7 @@ C++ 结构体字段必须与 Lua 表一一对应；Lua 没有的字段一律不�
 - 帧预算：主线程上的加载工作（启动任务、`onChildrenDone` 收尾、`runOnWorker` 的 `then`）统一排队，每帧在 `setFrameBudget`（默认 8ms）内执行，超出部分顺延到下一帧，每帧至少执行一项。
 - 生命周期：加载函数被调用过的资源（含失败的）由 `ResourceLoader` 持有，**析构时立即**调用 `releaseHold()`（不延迟）。调用方负责把 `ResourceLoader` 持有到真正不再需要这些资源的那一刻——典型用法是 `View` 把它持有到自己销毁为止（见下面的“View 加载流程”），这样加载完成的资源在整个 View 存活期间都不会被 `SpineSkeletonCache::purgeUnused()` 或 `FGUIPackageManager::unload()` 过早回收。需要资源比某个 View 活得更久（常驻资源）时，用 `std::shared_ptr` 让多个持有者共用同一个 `ResourceLoader`，最后一个持有者销毁时才真正释放（`AppContext::globalLoader()` 和 `LaunchView` 就是这么共用的）。
 - FGUI 包预热 ATLAS 项纹理（随后调用 `UIPackage::getItemAsset` 完成接管）和 SPINE 项的图集纹理；SPINE 骨架只在 `fairygui::UIConfig::useSkeletonCache` 为 true 时才会写入 `fairygui::GCache`（该开关默认关闭，且 `GCache` 没有按需释放接口）。SOUND 等其他项不处理。
-- `gameres::addRoleSpine(loader, roleId, preferCity)`：按角色 id 预热身体 Spine，和 `mugen::actor_spawner::resolveRoleSpine` 共用同一套路径/缩放规则（城镇 `_city` 覆盖、`/hero/` 默认缩放 0.25），确保预加载和运行时查询 `SpineSkeletonCache` 用的是同一个 key；跨客户端/战斗服共享，改动需要两边都重新编译。
-- `mugen::GameWord::resolveMap(mapId)`：Town/Room/Camp 共用一个 mapId 空间解析出 mapKey 和对应配置的纯查表函数，只读配置不加载任何东西；`loadMap` 和 `TownView`/`GameView` 的预加载都调用它，确保两边解析规则一致（包括联网对战时服务器下发的 mapId）。
+- `gameres::addRoleSpine(loader, roleId)`：按角色 id 预热身体 Spine。路径和缩放只来自 `mugen::AvatarPaths::resolveRoleSpine`（`role.resSpineId` → `res_spine`），不再猜测城镇 `_city` 骨架，也不再给 `/hero/` 强制 0.25 缩放。
 
 ### View 加载流程（Source/ui/core）
 
@@ -136,16 +142,16 @@ C++ 结构体字段必须与 Lua 表一一对应；Lua 没有的字段一律不�
   - 致命时弹出“资源加载失败/初始化失败”对话框，确认后结束程序；View 会一直停留在 Loading 状态，同一个 View 实例只会触发一次。
 - `AppContext` 持有一个全局加载器（`globalLoader()`：目前是 `config.bin`、`avatar.bin`，以后可以继续加别的常驻资源），生命周期和 AppContext 相同（`std::shared_ptr`），由 `LaunchView` 通过 `setResourceLoader()` 共同持有并驱动加载。`UI/Common` 本身是同步加载的（`AppContext::create/destroy` 直接 `FGUIPackageManager::load/unload`，只读取包描述，图集等到用到时才解码），因为 `LaunchView` 的进度条和 `AppContext` 的断线遮罩都要用到它，必须在第一个 View 创建之前就绪。
 - 启动流程：`MainScene` → `LaunchView`（驱动全局加载器）→ 加载完成后连接服务器 → `LoginView` → 登录成功 → `CharacterLobbyView`。
-- `TownView`/`GameView` 的 `onPrepareLoad` 会预加载地图（`MapResource`）、传送门/怪物的 Spine（`addRoleSpine`）和本地玩家的身体 Spine（`gameui::resolveLocalPlayerRoleId()`，和 `LocalBattleMode` 共用同一套角色解析/兜底规则），再把 `initGameWord`/`createLocalPlayer`/战斗模式初始化作为 step 跑；联网对战靠 `world_dump` 还原 Avatar，不会重复预加载本地玩家数据。
+- `TownView`/`GameView` 在战斗重写期间只保留视图骨架：战斗区显示 `Battle is being rebuilt`，城镇显示占位文字并继续走 town 服进出场景。副本选择仍进入 `GameView`（本地房间 id），返回城镇按钮仍在。联网战斗入口已关闭。
 - `ViewManager` 切换 View 时，`SpineSkeletonCache::purgeUnused()` 延后到新 View 进入 Active 之后才调度（而不是切换的那一刻）：新 View 的加载器这时已经把自己要用的共享数据标记为"在用"，不会被这次清理误删、又重新加载一遍（例如两个城镇之间来回传送，共用的英雄/传送门 Spine 不会被反复卸载重建）。
 
 ## 编码规范
 
 - 注释可中文；运行日志、错误文本等面向运维的输出用英文。
-- C++ 成员变量 `m_` 前缀；继承 `Object` 的类按「typedef Super → 公开方法 → 私有方法 → 私有成员 → 公开成员 → 序列化宏」排列；标量序列化用 `MG_DEFINE_SERIALIZABLE(...)`。
+- C++ 成员变量 `m_` 前缀；可反射的组件与配置结构体使用 `MG_REFLECT(...)`；继承 axmol `Object` 的类按「typedef Super → 公开方法 → 私有方法 → 私有成员 → 公开成员」排列。
 - UI 代码用 `gameui` 命名空间（避开 `ax::ui`）；战斗代码用 `mugen` 相关命名空间与既有宏。
 - Rust 按 `snake_case` / `CamelCase` 惯例。
-- 不要对必有指针做空判断（如 `MG_GET_COMPONENT` 返回值可为空，`ensureXxx` 之后不必再判空）。
+- 不要对必有指针做空判断（`ECSManager::tryGet<T>()` 返回值可为空，`ensureXxx` 之后不必再判空）。
 
 ## 构建入口
 
@@ -155,7 +161,6 @@ C++ 结构体字段必须与 Lua 表一一对应；Lua 没有的字段一律不�
 | battle | `AxmolFighter-Server/battle/CMakeLists.txt` |
 | 配置转换 | `AxmolFighter-Tools/config_converter/run_config_converter.ps1` |
 | 协议生成 | `AxmolFighter-Tools/protoc/run_proto_gen.ps1` |
-| sol 绑定 | `AxmolFighter-Tools/sol_binding/run_sol_binding.ps1` |
 | 编辑器 | `AxmolFighter-Editor/`（详见其 README） |
 
 ## 维护要求
