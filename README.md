@@ -9,7 +9,7 @@ AxmolFighter/
 ├── AxmolFighter-Client/          # C++ 客户端（Axmol 引擎 + CMake）
 │   └── Source/
 │       ├── AppDelegate.cpp / MainScene.cpp   # 入口
-│       ├── 3rd/     # protobuf-lite、behaviac 3.6.39（尚未接入编译）、spine 3.4
+│       ├── 3rd/     # protobuf-lite、spine 3.4
 │       ├── net/     # protobuf-lite 生成代码和客户端网络层（yasio）
 │       ├── mugen/   # 自研战斗/动作逻辑，battle 复用（见下）
 │       ├── ui/      # FairyGUI UI
@@ -54,7 +54,7 @@ AxmolFighter/
 
 `destroy` 只标记，实体到 `flushDestroyed` 才失效；按销毁请求顺序进入 FIFO 空闲表，存活列表稳定压缩，generation 用尽的 slot 永久退役。`each<Ts...>(fn)` 按创建顺序、调用开始时的固定上界遍历，回调参数是 `(Entity, Ts&...)`。遍历中可创建/标记销毁，禁止 flush；组件池增删后须重新 `get/tryGet`，不能继续使用可能已失效的引用。快照包含 slot（含待销毁次序及下一创建序号）、创建顺序、FIFO、按类型 id 排列的组件池和单例；反序列化只接受从未分配 slot 的空 manager，失败不写入目标。`clone` 深拷贝，`hash` 对快照字节使用 xxh64。System 仅保留 `update(sim::World&)` 接口。
 
-`sim/ai/DecisionTree` 是独立于 ROLE 动作树的决策层：C++ 手工构建 Entity 拓扑、函数指针分派 `AiAgent` 方法，反射组件保存警戒状态、运行调用栈、十秒仇恨计时及按首次命中排序的伤害记录。不链接 behaviac；Enter 守卫只在进入时检查，custom 中止条件只在 Sequence 子节点分派点检查，Running 叶子直接恢复。角色更新在控制输入和 ROLE 树前执行怪物 AI；目标与技能间隔复用 SkillPool，普通槽走 SkillAi，X/Z 槽不走自动施放条件。嘲讽读取 `buff::sneerTarget` 并覆盖目标。`MovementLeaves` 将巡逻、追击和警戒接入 ROLE 树，共享 ActionMove 状态；决策按 X、Z 顺序抽取偏移，叶子进入后抽取停留时长，全部使用本场 RngState。死亡目标重选，无目标的 NoAlert 角色巡逻，已经 Alert 的角色不重置警戒。自动战斗、走向传送门不在此实现范围。
+`sim/ai` 是怪物决策层，独立于角色状态机 `sim/role/brain`。`AiRules.h` 的 `kMonsterRules` 是 constexpr 条件表，每行最多三项判断，对应一个动作，可附带进入警戒和冷却，按优先级从高到低匹配：未警戒时，被激怒或在索敌范围内发现目标就释放 X 槽醒技能并进入警戒；巡逻结束后释放 Z 槽待机技能；其余情况巡逻。警戒后有目标时，技能间隔就绪或连段等待续接就释放最优普通技能；目标在追击范围外就追击；否则在警戒范围内游走。`AiDriver` 每帧在控制输入和角色状态机之前运行：先选目标（嘲讽优先；未警戒时取索敌范围内的目标；警戒后目标失效则从候选者中随机重选），再用 `gather()` 生成只读的 `AiFacts`，由 `pickRule` 选出第一条命中且不在冷却的规则。攻击中不做决策，移动中只允许更高优先级的规则抢占。动作只通过 `Role::changeStatus` 切换状态，由状态机中的 `CastState` / `AiMove` 执行。`AiAgent` 组件保存警戒、上次动作、规则冷却、技能间隔、十秒仇恨计时和按首次命中排序的伤害记录；进入警戒后不再清除。普通槽走 SkillAi 自动施放条件，X/Z 槽不走。嘲讽读取 `BuffHolder::sneerTarget` 并覆盖目标。巡逻和游走按 X、Z 顺序抽取偏移，移动叶子进入后抽取停留时长，全部使用本场 RngState。`WorldSetup::m_aiEnabled`（`mugen_sim_cli --ai off`）可整体关闭怪物决策：`TestsHeadless/data/replays/effects/` 是关 AI 的验收基线，`effects_ai/` 是开 AI 的基线。自动战斗、走向传送门不在此实现范围。
 
 ## 配置流水线
 `sim/room/RoomEntities` 装配战斗房间的门、障碍和物品：门采用 Close/Active/Transfer 三阶段，Fight_End 开放 Room 类型门；碰撞请求延迟到帧尾调用 `World::changeRoom`，保留玩家与 `isPassRoom` 角色句柄和池状态。门位置读取已转换的 `portalPosX/Z`，不依赖已删除的地图实体槽节点。障碍按受击次数销毁，死亡掉落由 HitHooks 接入，物品抛射完成后可拾取并施加 Buff。特效按 summonFrame 创建角色，出生前建立归属并继承属性；寿命按逻辑毫秒推进，标准伤害递归读取主人。Finding 已接入单目标点走跑叶子。网络 Stage/Camp 传送和宠物不在该实现中。
