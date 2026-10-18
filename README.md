@@ -123,23 +123,21 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
 
 ## 资源加载器（Source/resource, 命名空间 gameres）
 
-- 定位：异步预加载一批资源并驱动进度条。`View` 子类重写 `onPrepareLoad()` 声明要加载的资源和加载完成后要跑的初始化步骤；什么都不声明就不会出现加载界面，直接创建正式内容（见下面的“View 加载流程”）。
+- 定位：异步预加载一批资源并驱动进度条。`View` 子类重写 `onPrepareLoad()` 声明要加载的资源；什么都不声明就不会出现加载界面，直接创建正式内容（见下面的“View 加载流程”）。
 - `Resource`：资源描述基类，负责“加载什么”和持有加载结果；内置 `TextureResource` / `SpriteFramesResource` / `SpineResource` / `FguiPackageResource` / `AudioResource` / `ConfigResource` / `MapResource`，开发者可以继承它接入自定义类型。`ConfigResource` 在主线程解析全路径、工作线程反序列化；`MapResource` 只解析 `.layer` 的 JSON（`mugen::LayerRuntimeLoader::collectResources`，不建节点）再派生出 Spine/纹理/SpriteFrames/背景音乐子资源。`SpineResource` 按 ResSpine id 构造时，id 必须 `> 0` 才会走"按 id 查表"的路径（0 是"未配置"的常见哨兵值）。
 - `ResourceLoaderRegistry`：按 `ResourceType` 注册加载函数（签名 `void(std::shared_ptr<T>, const LoadTaskPtr&)`）和进度权重；`ResourceLoader::add<T>(...)` 按“类型 + key”去重，只能在 `start()` 之前调用；`LoadTask::spawn<T>(...)` 可以从一个资源内部派生子资源（受同一并发上限调度，均分计入父资源进度，不计入总权重），用于组合型资源（`FguiPackageResource` 派生图集纹理、`MapResource` 派生地图引用的各类资源）。
 - 进度：`Σ(weight_i * progress_i) / Σ(weight_i)`，权重只由注册表按类型配置（默认 FGUI 包 10、Map 10、Spine 3、Config 2、其余 1）；复杂类型可以调大权重避免进度卡在接近 100% 不动。有任务结束时才触发 `onProgress`；失败的任务也算结束，失败列表可以通过 `getFailedResources()` 轮询。
 - 帧预算：主线程上的加载工作（启动任务、`onChildrenDone` 收尾、`runOnWorker` 的 `then`）统一排队，每帧在 `setFrameBudget`（默认 8ms）内执行，超出部分顺延到下一帧，每帧至少执行一项。
 - 生命周期：加载函数被调用过的资源（含失败的）由 `ResourceLoader` 持有，**析构时立即**调用 `releaseHold()`（不延迟）。调用方负责把 `ResourceLoader` 持有到真正不再需要这些资源的那一刻——典型用法是 `View` 把它持有到自己销毁为止（见下面的“View 加载流程”），这样加载完成的资源在整个 View 存活期间都不会被 `SpineSkeletonCache::purgeUnused()` 或 `FGUIPackageManager::unload()` 过早回收。需要资源比某个 View 活得更久（常驻资源）时，用 `std::shared_ptr` 让多个持有者共用同一个 `ResourceLoader`，最后一个持有者销毁时才真正释放（`AppContext::globalLoader()` 和 `LaunchView` 就是这么共用的）。
-- FGUI 包预热 ATLAS 项纹理（随后调用 `UIPackage::getItemAsset` 完成接管）和 SPINE 项的图集纹理；SPINE 骨架只在 `fairygui::UIConfig::useSkeletonCache` 为 true 时才会写入 `fairygui::GCache`（该开关默认关闭，且 `GCache` 没有按需释放接口）。SOUND 等其他项不处理。
+- FGUI 包预热 ATLAS 项纹理（随后调用 `UIPackage::getItemAsset` 完成接管）和 SPINE 项的图集纹理；SPINE 骨架只在 `fairygui::UIConfig::useSkeletonCache` 为 true 时才会写入 `fairygui::GCache`（该开关默认关闭）。`FGUIPackageManager::unload` 引用计数归零时按同一份 ATLAS/SPINE 清单从 `TextureCache` / `GCache` 精确释放，不调用全量 `removeUnusedTextures` / `clearSkeletonData`。SOUND 等其他项不处理。
 - `gameres::addRoleSpine(loader, roleId)`：按角色 id 预热身体 Spine。路径和缩放只来自 `mugen::AvatarPaths::resolveRoleSpine`（`role.resSpineId` → `res_spine`），不再猜测城镇 `_city` 骨架，也不再给 `/hero/` 强制 0.25 缩放。
 
 ### View 加载流程（Source/ui/core）
 
-- `View::onPrepareLoad()`：在这里通过 `getResourceLoader()`（本 View 专属的加载器，持有到 View 销毁为止）或 `setResourceLoader(外部共同持有的加载器)`（比如 `AppContext::globalLoader()`；本 View 只负责在它还没 `start()` 时调用 `start()`，销毁时只释放自己的引用，不影响其他持有者）添加资源；再用 `addLoadStep(fn)` 添加资源就绪后要执行的初始化步骤（`fn` 返回 `false` 表示失败）。两者都没有就不会显示加载界面。
+- `View::onPrepareLoad()`：在这里通过 `getResourceLoader()`（本 View 专属的加载器，持有到 View 销毁为止）或 `setResourceLoader(外部共同持有的加载器)`（比如 `AppContext::globalLoader()`；本 View 只负责在它还没 `start()` 时调用 `start()`，销毁时只释放自己的引用，不影响其他持有者）添加资源。没有加载器就不会显示加载界面。资源就绪后创建正式内容并调用 `onEnter()`；World / 输入等主线程组装放在 `onEnter`。
 - 加载界面统一是 `ui/widgets/common/LoadingLayer`（Common 包里的 `LoadingLayer` 组件），进度显示不是直接跟着真实进度跳动，而是经过 `ProgressSmoother`（纯函数，不依赖引擎）平滑：落后时按指数缓动追赶（带最低速度，保证追得上）；追上后朝着一个比真实进度略高、但不超过 95% 的上限缓慢“爬行”，让玩家感觉一直在动；全部完成后再用较快的匀速冲到 100%。
-- 失败策略分两种：
-  - **预加载的资源失败**：调用 `View::onResourceLoadFailed(failed)`，默认只打印警告并返回 `true`，继续执行初始化步骤（运行时按老办法自行处理资源缺失，比如 Avatar 身体贴不上就是个空壳，不影响城镇/副本正常进入）。返回 `false` 才算致命。`LaunchView` 覆盖这个函数，让配置表这类核心资源加载失败一律致命。
-  - **初始化步骤失败**（`addLoadStep` 的 `fn` 返回 `false`）：固定视为致命，没有覆盖点。
-  - 致命时弹出“资源加载失败/初始化失败”对话框，确认后结束程序；View 会一直停留在 Loading 状态，同一个 View 实例只会触发一次。
+- 预加载失败时调用 `View::onResourceLoadFailed(failed)`，默认只打印警告并返回 `true`，继续创建正式内容（运行时按老办法自行处理资源缺失，比如 Avatar 身体贴不上就是个空壳，不影响城镇/副本正常进入）。返回 `false` 才算致命。`LaunchView` 覆盖这个函数，让配置表这类核心资源加载失败一律致命。致命时弹出“资源加载失败”对话框，确认后结束程序；View 会一直停留在 Loading 状态，同一个 View 实例只会触发一次。
+- `TownView` / `GameView` 在 `onPrepareLoad` 里用 `MapResource` 预热 `.layer` 引用的资源；`initTown` / 战斗 `init` 放到 `onEnter`。
 - `AppContext` 持有一个全局加载器（`globalLoader()`：目前是 `config.bin`、`avatar.bin`，以后可以继续加别的常驻资源），生命周期和 AppContext 相同（`std::shared_ptr`），由 `LaunchView` 通过 `setResourceLoader()` 共同持有并驱动加载。`UI/Common` 本身是同步加载的（`AppContext::create/destroy` 直接 `FGUIPackageManager::load/unload`，只读取包描述，图集等到用到时才解码），因为 `LaunchView` 的进度条和 `AppContext` 的断线遮罩都要用到它，必须在第一个 View 创建之前就绪。
 - 启动流程：`MainScene` → `LaunchView`（驱动全局加载器）→ 加载完成后连接服务器 → `LoginView` → 登录成功 → `CharacterLobbyView`。
 - `TownView`/`GameView` 在战斗重写期间只保留视图骨架：战斗区显示 `Battle is being rebuilt`，城镇显示占位文字并继续走 town 服进出场景。副本选择仍进入 `GameView`（本地房间 id），返回城镇按钮仍在。联网战斗入口已关闭。
