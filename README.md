@@ -9,7 +9,7 @@ AxmolFighter/
 ├── AxmolFighter-Client/          # C++ 客户端（Axmol 引擎 + CMake）
 │   └── Source/
 │       ├── AppDelegate.cpp / MainScene.cpp   # 入口
-│       ├── 3rd/     # protobuf-lite、spine 3.4
+│       ├── 3rd/     # protobuf-lite、spine 3.4、vfs（vendored 运行时，编进客户端/战斗服/TestsHeadless）
 │       ├── net/     # protobuf-lite 生成代码和客户端网络层（yasio）
 │       ├── mugen/   # 自研战斗/动作逻辑，battle 复用（见下）
 │       ├── ui/      # FairyGUI UI
@@ -63,13 +63,13 @@ AxmolFighter/
 
 1. 源表在参照工程 `heiyue/src/imports/table`。
 2. `AxmolFighter-Config/table/*.lua` 是转换后的扁平表。
-3. 纯 C++ 打包工具 `config_converter` 用 `conf/ConfigTables.h` 的 `MG_CONFIG_TABLES` 注册反射结构，严格读取全部 42 种 Lua 表并序列化为 `AxmolFighter-Client/Content/mugen/config/config.bin`。C++ 结构体字段必须与 Lua 表一一对应；多余字段、缺失字段、类型错误、非整数写入整数字段和重复 id 会在一次检查中汇总报告。Import 按每种表的字段并集只补齐缺失键；equip/fashion 按 `(id, occupation)` 排序去重检查，五种 ordinal 音效表保留行序。文件头为 `MGCF + version + schemaHash`，运行时 schema 不匹配会拒绝加载。客户端统一使用 `conf/ReflectedConfig.h` 的 `mugen::conf::Config::instance()`，加载接口为 `load/loaded`；`find<T>/get<T>` 按登记策略接受 id、`{id, occupation}` 或从 1 开始的 ordinal，`findById/getById` 仅用于 KeyById 表。引用链使用可空 find，时装职业由角色 id 推导，职业行缺失时再查 occupation=0 的公共行：
+3. 纯 C++ 打包工具 `config_converter` 用 `conf/ConfigTables.h` 的 `MG_CONFIG_TABLES` 注册反射结构，严格读取全部 42 种 Lua 表并序列化为 `AxmolFighter-Client/Content/mugen/config/config.bin`。资源路径字段写成 VFS 虚路径 `/mugen/...`。进程入口创建唯一的 `VirtualFileSystem`，把 `Content` 挂到虚根 `/`；`mugen::io::setVfs` 让战斗核共用该对象。客户端 `VfsFileUtils` 通过 `FileUtils::setDelegate` 接管引擎读写：`/mugen`、`/UI` 等走 VFS，axslc 着色器仍走原生搜索路径。C++ 结构体字段必须与 Lua 表一一对应；多余字段、缺失字段、类型错误、非整数写入整数字段和重复 id 会在一次检查中汇总报告。Import 按每种表的字段并集只补齐缺失键；equip/fashion 按 `(id, occupation)` 排序去重检查，五种 ordinal 音效表保留行序。文件头为 `MGCF + version + schemaHash`，运行时 schema 不匹配会拒绝加载。客户端统一使用 `conf/ReflectedConfig.h` 的 `mugen::conf::Config::instance()`，加载接口为 `load/loaded`；`find<T>/get<T>` 按登记策略接受 id、`{id, occupation}` 或从 1 开始的 ordinal，`findById/getById` 仅用于 KeyById 表。引用链使用可空 find，时装职业由角色 id 推导，职业行缺失时再查 occupation=0 的公共行：
 
 ```powershell
 powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --skip-configure
 ```
 
-工具还提供 `scaffold <ConfigDir> <kind>`、`verify <ContentDir>` 与 `selftest` 子命令。`pack-avatar <ContentDir>` 扫描 Content（包括 `res_zhcn`）下的 `.box` / `.motion` 并写入 `Content/mugen/config/avatar.bin`；文件头为 `MGAV + version + schemaHash`，运行时 schema 不匹配会记录错误并拒绝加载。`spine-box` 和 `spine-box-list` 是 C++ Spine 碰撞框导出子命令。
+工具还提供 `scaffold <ConfigDir> <kind>`、`verify <ContentDir>` 与 `selftest` 子命令。`pack-avatar <ContentDir>` 扫描 `mugen/` 下的 `.box` / `.motion`，以 `/mugen/...` 为 key 写入 `Content/mugen/config/avatar.bin`；文件头为 `MGAV + version + schemaHash`，运行时 schema 不匹配会记录错误并拒绝加载。`spine-box` 和 `spine-box-list` 是 C++ Spine 碰撞框导出子命令。
 数值超出目标整数或 Q44.20 Fixed 范围时，LuaReader 饱和到该类型边界；每种受影响表告警一次，并逐条输出原值与存储值。小数写入整数仍失败。`MG_CONFIG_REFS` 的全部引用边输出悬空数量与前五个样例，包括战斗链在内均只告警，不修改源 id；运行时遍历这些引用必须使用可空 `find`。
 
 ## 网络与服务架构
