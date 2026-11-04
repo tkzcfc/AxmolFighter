@@ -101,6 +101,61 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
   - 纯类型统一放 `game_types.proto`（PB.Types）
 - 生成：`AxmolFighter-Tools/protoc/run_proto_gen.ps1`。客户端协议输出到 `AxmolFighter-Client/Source/net/`，服务器内部协议输出到 `AxmolFighter-Server/battle/src/protocol/`（当前 `game_town.proto` 在忽略列表）。
 
+## 城镇同步模型（town）
+
+城镇内角色同步采用「客户端本地预测 + 服务端权威校验 + 固定频率广播」，外观由 game 服权威下发。
+
+### 消息一览
+
+| msg_id | 方向 | 消息 | 说明 |
+|---|---:|---|---|
+| 30000 | C→town | `TownMoveReport` | 本地预测移动上报（≤10 Hz，起停/朝向变化即时） |
+| 30001 | town→C | `ScenePlayerEnterPush` | AOI 内玩家进入（外观 + 运动状态） |
+| 30002 | town→C | `ScenePlayerLeavePush` | AOI 内玩家离开 |
+| 30003 | town→C | `ScenePlayerAppearancePush` | 玩家外观变化（换装/切宠物） |
+| 30004 | town→C | `ScenePlayerStatesPush` | 固定 tick 批量状态广播（send-on-change，不含自己） |
+| 30005 | town→C | `TownPositionCorrectionPush` | 仅发给发送者：权威位置校正 + 序号 |
+| 1302/1303 | C↔game | `EnterSceneReq/Resp` | 进入城镇；Resp 携带场景内玩家快照（外观+运动） |
+| 1308/1309 | C↔game | `LeaveSceneReq/Resp` | 离开城镇（进入本地副本等离线战斗时调用，town 据此刻推送 `ScenePlayerLeavePush`） |
+| 61000/61001 | game↔town | `TownEnterSceneReq/Resp` | 进入场景编排（携带外观） |
+| 61002/61003 | game↔town | `TownLeaveSceneReq/Resp` | 离开场景 |
+| 61004 | game→town | `TownUpdateAppearanceReq` | 外观变化单向通知 |
+
+### 关键类型（`game_types.proto`，PB.Types）
+
+- `TownVec3`：定点坐标（字段值 / 1000 = 像素），服务端整数运算避免浮点漂移。
+- `TownVel`：速度（像素/秒，浮点），仅用于远端斜向外推，不参与权威校验。
+- `TownMovement`：`pos`（定点）+ `facing`（0=左/1=右）+ `moving` + `vel` + `state`（motion 名）。
+- `TownAppearance`：`class_id` + `name` + `level` + `fashions[]`（`position`/`config_id`）+ `pet_id` + `base_skins[]`（`position`/`res_fashion_id`）+ `armament_id`。
+- `TownPlayerInfo`：`player_id` + `appearance` + `movement`（进入快照用）。
+
+### 流程
+
+1. **进入**：客户端 `EnterSceneReq`（仅目标 + 出生运动状态）→ game 用选中角色构造 `TownAppearance`，转发 `TownEnterSceneReq` 给 town → town 返回 `TownEnterSceneResp`（场景内玩家快照 `TownPlayerInfo[]`）→ game 绑定 town 后回 `EnterSceneResp`。
+2. **移动**：客户端本地预测并发送 `TownMoveReport`（`client_seq` + `client_time_ms` + `movement` + `ack_correction_seq`）；town 用「位移预算（token bucket）」校验位移：预算按服务端接收时间以 `max_speed × tolerance` 恢复、上限为 `max_speed × tolerance × burst_seconds`，位移（欧氏距离）超出预算则沿方向 clamp 并只回 `TownPositionCorrectionPush`；校正回包携带该上报的 `client_seq`，客户端确认（吸附）后经后续 `TownMoveReport.ack_correction_seq` 回传，town 在收到确认前丢弃在途上报（既不校验也不推进预算时间）。
+3. **广播**：town 按固定 tick（默认 10 Hz）把「发生变化」的玩家批量 `ScenePlayerStatesPush`（条目含 `server_time_ms` 供插值），排除接收者自身。
+4. **外观变化**：game 服换装/切宠物后发 `TownUpdateAppearanceReq` → town 广播 `ScenePlayerAppearancePush`。
+5. **AOI**：可配置半径；开启时进入/离开半径触发 enter/leave 推送，广播仅达半径内玩家；默认 `aoi_radius=0`（整个场景可见）。
+6. **离开**：客户端进入本地副本/决斗时发 `LeaveSceneReq`（1308）→ game 转发 `TownLeaveSceneReq`（61002）→ town 把玩家移出场景并向同场景广播 `ScenePlayerLeavePush`；返回城镇时重新 `EnterSceneReq`。
+
+### 客户端模型（`Source/ui/town/TownSync` + `TownScreen`）
+
+- **本地预测上报**：本地玩家发送 `TownMoveReport`（`client_seq` 递增 + `client_time_ms` + `movement` + `ack_correction_seq`），坐标按定点 `round(px × 1000)` 编码；移动中最多 10 Hz 周期上报，起停/朝向/状态变化即时上报，静止且无变化时不上报；`ack_correction_seq` 回填最近一次已应用校正的序号（新场景进入时重置为 0）。
+- **权威校正**：收到 `TownPositionCorrectionPush` 且 `seq ≥ 最近已应用校正序号` 时，把本地玩家吸附到权威位置（直接写 `Transform`，表现层大位移走既有 teleport snap），否则丢弃过期校正；吸附后把 `ack_correction_seq` 置为该序号并强制下一帧立即上报，使服务端尽快收到确认。
+- **远端插值**：`TownSync` 为每个远端玩家维护快照缓冲（以 `server_time_ms` 为键，上限 32）；用平滑（EMA）的单调时钟偏移估计「服务端现在 = 本地单调时钟 + 偏移」；渲染时刻取「估计服务端现在 − 插值延迟」，在相邻快照间线性插值；缓冲不足时沿最近 `vel` 外推（≤ 1 tick），快照间隔超过阈值直接吸附。插值结果每逻辑帧喂入既有木偶更新路径。
+- **插值常量**：`kInterpDelayMs = 2.5 × tick`（默认 250 ms）、`kExtrapolationMs = 1 tick`（100 ms）、`kSnapGapMs = 3 × tick`、`kMaxSnapshots = 32`、`kClockSmoothing = 0.1`。
+- **外观/宠物**：远端玩家按 `TownAppearance`（`class_id → roleId`、`base_skins → baseFashion`、`fashions → equipFashion`、`armament_id → 武器挂件 spine`、`pet_id → 宠物`）在进入与 `ScenePlayerAppearancePush` 时应用；本地玩家宠物来自 `PetLocalState.activeId`（响应 `PetFollowChanged`）。表现层按实体维护宠物（`AvatarPresenter` 实体 → `PetFollower` 映射），离开时清理。
+
+### 配置（`game/town/town.toml`，`[sync]`）
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `max_speed` | `600.0` | 最大移动速度（像素/秒） |
+| `tolerance` | `1.5` | 位移校验容差（相对 max_speed 的倍数） |
+| `burst_seconds` | `0.5` | 位移预算突发时长（秒）；预算上限 = `max_speed × tolerance × burst_seconds` |
+| `tick_ms` | `100` | 广播 tick 间隔（毫秒，默认 10 Hz） |
+| `aoi_radius` | `0.0` | AOI 半径（像素），0 表示关闭（整场景可见） |
+
 ## Battle 战斗服约定
 
 - 单线程 yasio 事件循环；网络事件、RPC 超时和战斗 tick 在同一线程，框架路径不加锁。
