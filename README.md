@@ -44,7 +44,7 @@ AxmolFighter/
 | `render/` | 仅客户端：Spine 后端、`LayerRuntimeLoader`、`VirtualCamera` |
 | `sim/` | 战斗逻辑（重写中）：`World` tick 管线、ECS 组件/单例登记、帧输入与表现事件、`.mgrp` 回放与 `mugen_sim_cli`；`ability/` 是组件化特殊能力池，按技能、命中、Buff 和角色生命周期事件稳定分派 | 
 
-职业映射约定：主角职业保持 `1..4`（对应 role id `101..104`）；伙伴职业作为独立职业扩展为 `5..7`（对应 role id `105..107`），不参与转职树。
+职业映射约定：主角职业保持 `1..4`（对应 role id `101..104`）；伙伴职业作为独立职业扩展为 `5..7`（对应 role id `105..107`），不参与转职树。创角请求中，伙伴职业必须使用 `hair_id=0`、`clothes_id=0`，外观由 `role.resFashion` 回退链决定。
 
 旧玩法层（对象图式技能/Buff/AI/特效、联网战斗）已删除，战斗由 `sim/` 重建。`sim/` 目前实现完整的单人战斗：`World::tick` 按固定顺序推进（时钟 → 逻辑定时器 → 控制事件 → 相机/慢放 → 实体组 Role/Effect/Obstacle/Goods/Portal → 场景 → 碰撞 → `flushDestroyed`）；组件与单例登记表在 `sim/Components.h` / `sim/Singletons.h`；帧输入由 `FrameInput` / `PlayerCommand` / 系统命令 / puppet 更新组成；`PresentationEvent` 队列承载表现层事件，`LogicTimers` 提供逻辑定时器。`sim/BattleBootstrap` 提供统一引导（`world.init + spawn + RoomDirector::enter`），离线客户端与 `mugen_sim_cli replay` 复用同一路径。`sim/Replay` 的 `.mgrp` 头携带完整 `WorldSetup`（seed/mode/room/mapKey、玩家出生参数、stage/copy、AI 开关、是否启用 scenario hooks），配套 `mugen_sim_cli`（`replay` / `run-room` / `record-room` / `--compare`）与测试侧 `TestsHeadless/support/ScenarioHarness` 无头驱动。
 
