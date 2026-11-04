@@ -121,7 +121,7 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
   - `kAsyncExclusive`：异步 + 实例私有数据（UI 角色），就绪后浮现；`Avatar::setAppearance` 整体下发外观，身体 atlas/皮肤异步换装（最新请求优先），武器/翅膀数据嫁接到身体插槽。
 - 换装原理：身体部位（发型/衣服/皮肤…）= 同一骨架换合并 atlas（attachment 按同名 region 重指）；武器/翅膀/光环 = 独立 spine 挂件，武器/翅膀的 attachment 同时嫁接到身体插槽用于动作表现。
 - 帧动画（纸娃娃）资源的接入方式：离线转换为 spine（每部位一个 slot，attachment 时间轴 + drawOrder；每个部位的区域名一致的 atlas），直接复用 atlas 换装；`AniData`/`MotionEntryType::kAni` 仅保留数据类型，运行时不使用。
-- Spine 数据归属在创建时确定（`MgSkeletonData::isExclusive`），不从 `use_count` 推断；共享缓存 key 为骨架 + 规范化 atlas 列表 + scale，切换 View 后 `purgeUnused`。
+- Spine 数据归属在创建时确定（`MgSkeletonData::isExclusive`），不从 `use_count` 推断；共享缓存 key 为骨架 + 规范化 atlas 列表 + scale，切换 View 后 `purgeUnused`：删掉仅被缓存持有的骨架，并对 atlas 页在 `TextureCache` 只剩自身引用时 `removeTextureForKey`（不调用全量 `removeUnusedTextures`）。
 - 逻辑文件放 `mugen/avatar/` 根目录（禁止 include axmol/spine）；渲染文件放 `render/` 并整体 `#ifdef RUNTIME_IN_AXMOL`（battle CMake 自动排除）。
 - 状态机经 `AvatarComponent::play` 驱动 `MotionPlayer`；渲染 `Avatar` 由 `AvatarPresenter` 跟随（动作变化时 setMotion + seek，漂移超过阈值时 seek 校正）。`MotionState` 是可序列化的播放标量，包含 `.motion` 路径、播放位置和速度。
 
@@ -135,13 +135,14 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
 - 生命周期：加载函数被调用过的资源（含失败的）由 `ResourceLoader` 持有，**析构时立即**调用 `releaseHold()`（不延迟）。调用方负责把 `ResourceLoader` 持有到真正不再需要这些资源的那一刻——典型用法是 `View` 把它持有到自己销毁为止（见下面的“View 加载流程”），这样加载完成的资源在整个 View 存活期间都不会被 `SpineSkeletonCache::purgeUnused()` 或 `FGUIPackageManager::unload()` 过早回收。需要资源比某个 View 活得更久（常驻资源）时，用 `std::shared_ptr` 让多个持有者共用同一个 `ResourceLoader`，最后一个持有者销毁时才真正释放（`AppContext::globalLoader()` 和 `LaunchView` 就是这么共用的）。
 - FGUI 包始终加载描述文件。`FguiPackageResource(path, preloadTextures=true, preloadSpine=true)` 控制是否预热 ATLAS 纹理（随后 `UIPackage::getItemAsset` 接管）和 SPINE 图集页贴图；骨架只在 `fairygui::UIConfig::useSkeletonCache` 为 true 时写入 `GCache`。`preloadSpine==false` 时不预热 Spine 页贴图也不预热骨架。同一 loader 内按路径去重，第一次 add 的开关生效。`FGUIPackageManager::unload` 引用计数归零时按包内 ATLAS/SPINE 清单从 `TextureCache` / `GCache` 精确释放，不调用全量 `removeUnusedTextures` / `clearSkeletonData`。SOUND 等其他项不处理。
 - `gameres::addRoleSpine(loader, roleId)`：按角色 id 预热身体 Spine。路径和缩放只来自 `mugen::AvatarPaths::resolveRoleSpine`（`role.resSpineId` → `res_spine`），不再猜测城镇 `_city` 骨架，也不再给 `/hero/` 强制 0.25 缩放。
+- `gameres::addRoleEffects(loader, roleId, aiDifficulty=0)`：预热该角色战斗技能会创建的特效 Spine。收集逻辑在 `mugen::sim::collectRoleEffectSpineIds`：职业角色用 `offlineKit`，怪物用 AI loadout，再沿 `nextSkill` / `action.effectIds` / `effect.nextEffectId` / `hitEffectIds` / 子特效 / 召唤角色展开；每个 `resSpineId` 以 `SpineResource(id)` 加入 loader，和运行时 `MgSkeletonAnimation::createFromCache(id)` 共用缓存 key。
 
 ### View 加载流程（Source/ui/core）
 
 - `View::onPrepareLoad()`：在这里通过 `getResourceLoader()`（本 View 专属的加载器，持有到 View 销毁为止）或 `setResourceLoader(外部共同持有的加载器)`（比如 `AppContext::globalLoader()`；本 View 只负责在它还没 `start()` 时调用 `start()`，销毁时只释放自己的引用，不影响其他持有者）添加资源。没有加载器就不会显示加载界面。资源就绪后创建正式内容并调用 `onEnter()`；World / 输入等主线程组装放在 `onEnter`。
 - 加载界面统一是 `ui/widgets/common/LoadingLayer`（Common 包里的 `LoadingLayer` 组件），进度显示不是直接跟着真实进度跳动，而是经过 `ProgressSmoother`（纯函数，不依赖引擎）平滑：落后时按指数缓动追赶（带最低速度，保证追得上）；追上后朝着一个比真实进度略高、但不超过 95% 的上限缓慢“爬行”，让玩家感觉一直在动；全部完成后再用较快的匀速冲到 100%。
 - 预加载失败时调用 `View::onResourceLoadFailed(failed)`，默认只打印警告并返回 `true`，继续创建正式内容（运行时按老办法自行处理资源缺失，比如 Avatar 身体贴不上就是个空壳，不影响城镇/副本正常进入）。返回 `false` 才算致命。`LaunchView` 覆盖这个函数，让配置表这类核心资源加载失败一律致命。致命时弹出“资源加载失败”对话框，确认后结束程序；View 会一直停留在 Loading 状态，同一个 View 实例只会触发一次。
-- `TownView` / `GameView` 在 `onPrepareLoad` 里用 `MapResource` 预热 `.layer` 引用的资源；`initTown` / 战斗 `init` 放到 `onEnter`。
+- `TownView` / `GameView` 在 `onPrepareLoad` 里用 `MapResource` 预热 `.layer` 引用的资源；`GameView` 还会按本地玩家和房间 `monsterIds` 调用 `addRoleEffects` 预热角色特效 Spine。`initTown` / 战斗 `init` 放到 `onEnter`。
 - `AppContext` 持有一个全局加载器（`globalLoader()`：目前是 `config.bin`、`avatar.bin`，以后可以继续加别的常驻资源），生命周期和 AppContext 相同（`std::shared_ptr`），由 `LaunchView` 通过 `setResourceLoader()` 共同持有并驱动加载。`UI/Common` 本身是同步加载的（`AppContext::create/destroy` 直接 `FGUIPackageManager::load/unload`，只读取包描述，图集等到用到时才解码），因为 `LaunchView` 的进度条和 `AppContext` 的断线遮罩都要用到它，必须在第一个 View 创建之前就绪。
 - 启动流程：`MainScene` → `LaunchView`（驱动全局加载器）→ 加载完成后连接服务器 → `LoginView` → 登录成功 → `CharacterLobbyView`。
 - `TownView`/`GameView` 在战斗重写期间只保留视图骨架：战斗区显示 `Battle is being rebuilt`，城镇显示占位文字并继续走 town 服进出场景。副本选择仍进入 `GameView`（本地房间 id），返回城镇按钮仍在。联网战斗入口已关闭。
