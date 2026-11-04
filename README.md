@@ -54,6 +54,9 @@ AxmolFighter/
 
 伙伴怒气职业（roleId=107）在 sim 侧新增 `PartnerRageState` 组件：施法管线开始记录首段技能 `rage`，首次命中结算一次怒气，怒气满后可通过怒气槽位 `P`（`CTR_ATKQ`）触发变身；变身状态同步到 `MotionState::m_partnerRageTransformed`，并通过 `PresentationEvent::PartnerRageChanged` 通知表现层。对应配置由 `partner` 表提供 `roleId/partnerType/typeValue`（`partnerType=1` 表示怒气变身伙伴，`typeValue` 为冻结毫秒）。
 
+连击与评价由 `sim/role/RoleCombo` 提供（临时视图，状态存 `RoleHitState`）：命中时 `HitResolver` 以 `effect.comboExp * m_parameterExp` 调用 `RoleCombo::add(exp, target)`，累加连击数并结算评价经验；`RoleActor` 每帧调用 `RoleCombo::update()` 推进连击超时（`kComboTimeMs` 2000ms）与按评价等级的每帧经验衰减。评价经验 `m_evaluateExp` 按 `kComboStageExp` 阈值（200/500/1000/1700/2500）映射为评价等级 `m_curEvaluate`，封顶 2500；击杀与眩晕各额外增加 `kComboKillExp`/`kComboStunExp`（50），首领（roleType 4）按 `kComboBossExpRate`（3）倍率结算，击杀奖励按目标去重（`m_comboKilledTargets`）。评价等级同步写入 `BuffExternalConditions::m_comboEvaluate` 供 Buff/能力条件读取；`BuffRules` 的连击规则按评价等级写入 `m_parameterExp` 倍率。
+
+
 `core/bt` 已拆成共享定义与值实例：`BTDef<Param>` 保存只读 DFS 节点、条件和参数池，派生直接子节点索引表（`firstChild` 指向该表）与紧凑叶状态索引；`BTInstance<LeafState>` 通过 `MG_REFLECT` 保存节点状态、int16 游标、Parallel 运行集、条件状态和叶状态。`BTRunner<Context, Param, LeafState>` 是瞬时执行视图，`BTRegistry` 仅存函数指针。Context/参数/叶状态由 sim 定义；当前仅 `TestsHeadless/tests/BTTestTypes.h` 提供测试 variant。`std::monostate` 在归档中为零字节载荷，variant 仍写 u8 标签。
 
 组件快照只保存定义 key + instance；`BTDefCache<Key, Param, Config>` 用不可变配置和构建函数按 key 重建拓扑，缓存须比 runner 活得久。Selector 不抢占，成功后环形尝试其他兄弟；Sequence 忽略子节点 Failure；组合节点运行期间守卫失效返回 Success。退出先处理运行子节点，再将父游标/状态复位，最后逆序退出运行条件。Parallel 的 update 永不 Failure，但 enter 在守卫拒绝或无子节点可进入时返回 Failure。根停止只记一次错误，不自动重启。空 Sequence 在定义构造时拒绝。
@@ -67,7 +70,7 @@ AxmolFighter/
 ## 配置流水线
 `sim/room/RoomEntities` 装配战斗房间的门、障碍和物品：门采用 Close/Active/Transfer 三阶段，Fight_End 开放 Room 类型门；碰撞请求延迟到帧尾调用 `World::changeRoom`，保留玩家与 `isPassRoom` 角色句柄和池状态。门位置读取已转换的 `portalPosX/Z`，不依赖已删除的地图实体槽节点。障碍按受击次数销毁，死亡掉落由 HitHooks 接入，物品抛射完成后可拾取并施加 Buff。特效按 summonFrame 创建角色，出生前建立归属并继承属性；寿命按逻辑毫秒推进，标准伤害递归读取主人。Finding 已接入单目标点走跑叶子。网络 Stage/Camp 传送和宠物不在该实现中。
 
-`sim/room/RoomDirector` 在创建主控角色后显式启用，房间配置、状态队列、30ms 转换等待、波次和复活预算保存在 `RoomState`。场景阶段处理清场、Clear/Defense/Survive 和胜负事件；Defense 的 2 秒倒计时由 `LogicTimers` 驱动。非普通清场房的首领全部死亡时启动 `SlowMotion` 中的 `KoSlowMotion`，按未缩放固定秒数推进降速、保持、恢复三段曲线。复活和返回城镇通过 `FrameInput.systemCommands`；客户端先消费帧结果，再切换城镇视图。房间提示与胜负只发出表现事件，不调用结算网络或自动传送。
+`sim/room/RoomDirector` 在创建主控角色后显式启用，房间配置、状态队列、30ms 转换等待、波次和复活预算保存在 `RoomState`。场景阶段处理清场、Clear/Defense/Survive 和胜负事件；Defense 的 2 秒倒计时由 `LogicTimers` 驱动。非普通清场房的首领全部死亡时启动 `SlowMotion` 中的 `KoSlowMotion`，按未缩放固定秒数推进降速、保持、恢复三段曲线。复活和返回城镇通过 `FrameInput.systemCommands`；客户端先消费帧结果，再切换城镇视图。房间提示与胜负只发出表现事件，不调用结算网络或自动传送。PVP 1v1 决斗按 `WorldSetup::m_pvp` 分支（不按房间类型猜测）：禁用复活，逐帧统计各阵营存活玩家英雄，一方被清空判 KO（启动 KO 慢放、双方禁用受击、`m_winnerCamp` 记胜者），超时则按剩余生命比例判定（相等判平局，本地按失败处理）；结果写入 `PvpRoundEnd{winnerCamp, reason, hp ratios}` 表现事件，限时与出生生命倍率来自 `WorldSetup::m_pvpTimeLimit`（默认 100 秒）与 `m_pvpHpScale`（出生时缩放基础生命与生命上限）。
 
 1. 源表在参照工程 `heiyue/src/imports/table`。
 2. `AxmolFighter-Config/table/*.lua` 是转换后的扁平表。
