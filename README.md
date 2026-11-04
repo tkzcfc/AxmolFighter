@@ -48,6 +48,10 @@ AxmolFighter/
 
 旧玩法层（对象图式技能/Buff/AI/特效、联网战斗）已删除，战斗由 `sim/` 重建。`sim/` 目前实现完整的单人战斗：`World::tick` 按固定顺序推进（时钟 → 逻辑定时器 → 控制事件 → 相机/慢放 → 实体组 Role/Effect/Obstacle/Goods/Portal → 场景 → 碰撞 → `flushDestroyed`）；组件与单例登记表在 `sim/Components.h` / `sim/Singletons.h`；帧输入由 `FrameInput` / `PlayerCommand` / 系统命令 / puppet 更新组成；`PresentationEvent` 队列承载表现层事件，`LogicTimers` 提供逻辑定时器。`sim/BattleBootstrap` 提供统一引导（`world.init + spawn + RoomDirector::enter`），离线客户端与 `mugen_sim_cli replay` 复用同一路径。`sim/Replay` 的 `.mgrp` 头携带完整 `WorldSetup`（seed/mode/room/mapKey、玩家出生参数、stage/copy、AI 开关、是否启用 scenario hooks），配套 `mugen_sim_cli`（`replay` / `run-room` / `record-room` / `--compare`）与测试侧 `TestsHeadless/support/ScenarioHarness` 无头驱动。
 
+联机回滚由 `sim/rollback/RollbackSession` 提供（编译进客户端与战斗服，无引擎依赖）。会话持有 `World`、按固定深度 `kMaxRollbackFrames` 保存每帧快照，按槽位维护已确认/预测输入：本地槽位用 `addLocalInput` 提交预测，远端槽位缺失输入时重复该槽位最近一次确认输入；`addConfirmedInput` 接收服务器确认（乱序、重复幂等、冲突记错误），确认与已用预测不一致时回滚到最早不一致帧之前的快照并重推。预测帧数超过窗口深度时 `advanceTo/tick` 返回 false 停止推进（stall），避免快照被覆盖。`resync(frame, snapshot)` 采用服务器快照复位并丢弃旧历史。会话累计 `rollbacks/maxDepth/resimFrames/stalls/mispredictions` 统计，`mugen_sim_cli rollback-sim` 用模拟延迟驱动会话并打印统计。
+
+表现事件带稳定身份以便回滚去重：`PresentationEvent` 新增每帧从零重计的 `ordinal` 字段（`seq` 仍为全局单调，仅供追踪输出与离线去重）；`RollbackSession` 收集各帧事件，按「帧 + 实体 + ordinal + 载荷」哈希去重后经 `eventsToPresent()` 输出，重推产生的同帧同内容事件被跳过、误预测产生的新事件照常呈现（不撤销已播放事件）。表现层 `WorldPresenter` 新增 `presentEvents(events, …)` 消费会话去重后的显式列表（不再按 `seq` 单调去重），离线 `LocalBattleMode` 仍走原 `present(world, …)` 路径，行为不变。
+
 伙伴怒气职业（roleId=107）在 sim 侧新增 `PartnerRageState` 组件：施法管线开始记录首段技能 `rage`，首次命中结算一次怒气，怒气满后可通过怒气槽位 `P`（`CTR_ATKQ`）触发变身；变身状态同步到 `MotionState::m_partnerRageTransformed`，并通过 `PresentationEvent::PartnerRageChanged` 通知表现层。对应配置由 `partner` 表提供 `roleId/partnerType/typeValue`（`partnerType=1` 表示怒气变身伙伴，`typeValue` 为冻结毫秒）。
 
 `core/bt` 已拆成共享定义与值实例：`BTDef<Param>` 保存只读 DFS 节点、条件和参数池，派生直接子节点索引表（`firstChild` 指向该表）与紧凑叶状态索引；`BTInstance<LeafState>` 通过 `MG_REFLECT` 保存节点状态、int16 游标、Parallel 运行集、条件状态和叶状态。`BTRunner<Context, Param, LeafState>` 是瞬时执行视图，`BTRegistry` 仅存函数指针。Context/参数/叶状态由 sim 定义；当前仅 `TestsHeadless/tests/BTTestTypes.h` 提供测试 variant。`std::monostate` 在归档中为零字节载荷，variant 仍写 u8 标签。
