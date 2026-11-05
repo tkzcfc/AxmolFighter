@@ -190,10 +190,33 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
   1. **表现层插值进度与逻辑 tick 不同相（稳态重影的主因，无需任何回滚也出现）**：联网时逻辑 tick 由时钟估计驱动，旧实现的渲染 alpha 是独立回绕的墙钟锯齿，与「previous/current 随 tick 滚动」不同相，位置在一个逻辑帧内来回跳约 27 单位。现在 `TickAlpha`（`render/battle/PoseTrack.h`）从最近一次逻辑 tick 起算 alpha（tick 迟到停在 1、不回绕）。
   2. **开局校准期输入必然迟到**：初始领先量（4 帧）远小于 RTT，起步的方向命令在服务器目标帧之后才到，被顺延 / 丢弃后客户端回滚——起步即被拉回。现在首个 RTT 样本直接把领先量抬到覆盖 RTT（`ceil(1.25·rtt/frame_ms)` + 目标富余）；`NetBattleSync::inputReady` 在首个 RTT 样本到达前、以及领先量增大后的追帧期间（帧号 < 估计服务器帧 + 领先量 − 容差）不采样本地输入（按键状态保留，放行后的第一帧照常发出，`NetBattleMode` 与测试客户端一致）。领先量变化后的「生效帧」同样跳过追帧期间的帧，避免连续超调（领先量峰值 28→20 @200 ms）。
   3. **迟到过久的移动命令被丢弃**：见上，丢掉 `CTR_RUN`/`CTR_IDLE` 会让服务器权威状态与本地永久不一致（实测一次回滚拉回 220~770 单位）；现保留最后一条移动状态命令。
-  4. **回滚后的硬拉回**：`PoseTrack` 在回滚前后记录角色位置差，`NetBattleMode::applyRollbackCorrections` 把差交给 `WorldPresenter::applyCorrection`：轨迹整体平移使显示位置连续，偏移以 100 ms 时间常数指数衰减；超过 400 单位或跳帧 > 8 / 帧号回退（重同步）才直接吸附。只读模拟位置，不改写模拟状态，确定性不受影响。
+  4. **回滚后的硬拉回**（本地玩家档；对端角色的长时间常数档见下一条）：`PoseTrack` 在回滚前后记录角色位置差，`NetBattleMode::applyRollbackCorrections` 把差交给 `WorldPresenter::applyCorrection`：轨迹整体平移使显示位置连续，偏移以 100 ms 时间常数指数衰减；超过 400 单位或跳帧 > 8 / 帧号回退（重同步）才直接吸附。只读模拟位置，不改写模拟状态，确定性不受影响。
   实测（修复前 → 后，本地英雄）：稳态（收敛后）显示层反向抖动事件 212~801 次 → 0；本地错误预测 / 回滚（全程含校准期）2~15 → 0（稳定链路）；服务器对本槽位丢弃的输入 1~7 → 0；100→300 ms 突变的瞬间仍会有 2~11 次回滚（不可避免，之后 0），显示层按上面 4 平滑消化。
+- **高延迟下「对端被拉回」的根因与对策**（RTT > 300 ms 时对端移动的英雄在其停下 / 转向时被明显拉回）：远端输入缺失时预测为空输入，「保持当前动作」使跑动状态持续；对端停下的 `CTR_IDLE` 要等确认帧到达才知道，本地回滚会把对端英雄从「预测多跑出去的位置」拉回，错误预测窗口 ≈ 本地领先确认帧的帧数 + 单向时延 ≈ 1.5×RTT（RTT 445 ms 实测回退 175~320 单位，超过 400 单位还会被旧平滑直接吸附）。两处对策：
+  1. **对端角色用更长的纠正平滑**（只在表现层，不改模拟 / 哈希）：`PoseTrack` 有 `CorrectionProfile::Local / Remote` 两档，`AvatarPresenter::present` 对镜头跟随实体（本地玩家）用 Local（时间常数 `kCorrectionTauSec`=0.1 s，吸附阈值 `kMaxCorrection`=400，与此前完全一致），其余角色用 Remote：衰减时间常数随当前偏移长度从 `kRemoteCorrectionTauMinSec`=0.1 s 线性增至偏移 ≥ `kRemoteTauFullOffset`=450 时的 `kRemoteCorrectionTauMaxSec`=0.3 s（偏移衰减变小时时间常数同步变短，尾段不拖长），吸附阈值放大到 `kRemoteMaxCorrection`=900，250~500 单位的纠正滑行而不瞬移；偏移始终衰减到 < `kOffsetEpsilon` 后严格归零（对端静止时不留漂移）。跳帧 > 8 / 帧号回退（重同步）/ 单帧模拟位置跳变 > 500（瞬移）仍直接吸附并清偏移。
+  2. **自适应本地输入延迟 D**（`NetBattleSync`，默认 `LocalDelayMode::Auto`）：采样于第 t 帧的本地输入被安排到第 t + D 帧生效，并立即（提前 D 帧）随 `BattleInputPush` 发给服务器；本地预测的第 t 帧用 D 帧之前安排好的输入，所以本地英雄只是晚 D 帧响应按键（输入延迟 D×33 ms），不产生任何本地错误预测。与此同时「输入领先量 + D」保持不变（D 每增 1 帧，领先量减 1 帧并清空富余样本的旧有效起点），服务器看到的输入时刻、迟到余量都不变，而客户端少领先服务器 D 帧——本地对远端预测的窗口缩短 D 帧，对端被回滚拉回的距离随之变小。`shrinkFloor` 的 RTT 下限也扣除 D。
+     - **调度与过渡（每个帧号恰好一份输入、发出后不再改写）**：`m_scheduledThrough` 是已安排输入的最大帧号。`NetBattleSync::submitLocalInput(frame, input)` 把采样安排到 `frame + D`：D 增大时中间空出的帧补空输入（缓冲）；D 减小时 `inputReady` 对「生效帧已被占用」的那一帧返回 false，`NetBattleMode` 因此不调用 `ControlManagerCore::advance`（按键状态保留到下一帧采样，不丢不重，与校准期 / 追帧期的既有门控一致）。冗余重发环容量为 `m_redundantInputFrames + D`，重发内容与首次发出逐字节一致；`resync` 把仍在快照帧之后的已发输入放回会话并保持 `m_scheduledThrough`；反馈样本的生效帧按输入帧号（= 推进帧 + D）计。
+     - **控制律**（`updateLocalDelay`，每次反馈调用）：平滑 RTT ≤ `m_localDelayRttThresholdMs`(250) 时 D = 0，否则目标 = `ceil((srtt − 250) / 2 / frame_ms)` 封顶 `m_localDelayMaxFrames`(5)；升得快（每 `m_localDelayRaiseIntervalMs`=100 ms 升 1 帧）、降得慢（RTT 加上 `m_localDelayLowerMarginMs`=30 ms 滞回后算出的目标仍低于当前 D 并持续 `m_localDelayLowerHoldMs`=2000 ms 才降 1 帧），始终一次变 1 帧。调试可切 `Auto / Forced(m_localDelayForcedFrames，上限 m_localDelayDebugMaxFrames=10) / Off`。无协议改动。
+  3. **实测**（`net_duel_sync_test` 的 `runRemotePullbackSuite`：槽位 0 反复「右跑 0.9 s、停 1.5 s、左跑 0.9 s、停 1.5 s」，槽位 1 的客户端用与 `WorldPresenter` 同一套 `PoseTrack` 显示槽位 0；单向时延 d、抖动 0.2d；回退 = 权威停下后 1.1 s 内显示位置相对已达最远点的回退；back100 = 100 ms 内最大回退距离，越小越像滑行、越大越像瞬移；跳变 = 单个 60 Hz 渲染帧显示位移 > 40 单位的次数）：
+
+     | 单向 / RTT | 方案 | D | 回退 max / avg | back100 max | 跳变 |
+     |---|---|---|---|---|---|
+     | 150 ms / 344 | 旧（无 D、本地平滑） | 0 | 247.6 / 122.3 | 153.2 | 2 |
+     | | 仅远端平滑 | 0 | 247.5 / 122.2 | 99.0 | 0 |
+     | | 仅 D | 2 | 210.9 / 103.9 | 130.0 | 2 |
+     | | D + 远端平滑 | 2 | 210.9 / 103.9 | 89.4 | 0 |
+     | 200 ms / 445 | 旧 | 0 | 320.9 / 175.8 | 199.5 | 43 |
+     | | 仅远端平滑 | 0 | 320.6 / 175.6 | 115.2 | 0 |
+     | | 仅 D | 4 | 247.6 / 135.9 | 153.2 | 5 |
+     | | D + 远端平滑 | 4 | 247.4 / 135.7 | 99.0 | 0 |
+     | 250 ms / 567 | 旧 | 0 | 394.3 / 206.6 | 394.3 | 61 |
+     | | 仅远端平滑 | 0 | 393.4 / 205.4 | 128.0 | 0 |
+     | | 仅 D | 5 | 293.3 / 154.2 | 178.7 | 20 |
+     | | D + 远端平滑 | 5 | 292.9 / 154.0 | 107.6 | 0 |
+
+     RTT ≤ 250（单向 100 ms）D 恒为 0，行为与此前完全一致。平滑负责把瞬移变成滑行（back100 −35%~−70%、跳变归零），D 负责缩短回退距离（avg −15%~−25%）；本地英雄在 Auto 下仍满足「稳态 0 次本地错误预测、不被拉回」（movement 套件）。
 - 预测规则：远端槽位（及本地槽位无本地输入的帧）预测空输入。`ControlManagerCore` 只在方向 / 按键变化时发令（`CTR_RUN` 仅在方向变化时发出，持续按住不重复），空输入在模拟里等价于「保持当前动作」，因此持续移动几乎不会错预测；只有边缘事件（对端点击攻击、改变方向）才错预测并触发回滚，每次回滚重推约「输入领先量 + 单向时延」帧（领先量自适应，20/60 ms 实测 5–8 帧，连点普攻约 2 次回滚/秒）。不要改成「重复最近一次非空输入」，那会把单次攻击事件重复触发。`RollbackStats` 把错误预测拆成 `localMispredictions`（本地输入被服务器改写，网络正常时应为 0）与 `remoteMispredictions`（对端边缘输入，预期内），`RollbackSession` 会丢弃已落出回滚窗口的输入历史并忽略窗口外的迟到确认。
-- 联网调试面板（`NetBattleMode::renderDebugPanel`）最顶部是醒目的 `延迟(RTT): XX ms  抖动: XX ms` 与输入领先量行（`BattleDebugPanel::renderNetLatency`，<100 ms 绿 / <200 ms 黄 / 其后红），`Battle Debug` 窗口在联网模式下同样显示该行（`IBattleMode::netInfo`）；面板还带「模拟延迟」调试滑条（上行 / 下行额外延迟与抖动，默认 0，只在 `NetBattleMode` 内延迟收发战斗消息，同方向保持顺序，用于本机复现高延迟，面板 RTT 会包含它），并统计回滚改写本地英雄位置的次数与距离。其余显示当前输入领先量（帧 / ms）、测得 RTT 与抖动、服务器累计迟到输入数与最近一次富余帧数，以及最近一秒的回滚 / 重推 / 追帧 / 停顿计数，以及 sim（本地预测推进）、net（确认输入 + 回滚重推 + 对账）、present（表现层）三段的平均 / 最大耗时，另记整场最坏值；一秒窗口内最长渲染帧超过 60 ms 时输出一条限频的英文卡顿日志，无逐帧日志。
+- 联网调试面板（`NetBattleMode::renderDebugPanel`）最顶部是醒目的 `延迟(RTT): XX ms  抖动: XX ms` 与输入领先量行（`BattleDebugPanel::renderNetLatency`，<100 ms 绿 / <200 ms 黄 / 其后红），`Battle Debug` 窗口在联网模式下同样显示该行（`IBattleMode::netInfo`）；面板还带「模拟延迟」调试滑条（上行 / 下行额外延迟与抖动，默认 0，只在 `NetBattleMode` 内延迟收发战斗消息，同方向保持顺序，用于本机复现高延迟，面板 RTT 会包含它），并统计回滚改写本地 / 对端英雄位置的次数与距离，另有「本地输入延迟」模式（自动 / 固定 / 关闭）与固定帧数滑条，面板与 `Battle Debug` 的网络行都显示当前 D（帧 / ms）与模式。其余显示当前输入领先量（帧 / ms）、测得 RTT 与抖动、服务器累计迟到输入数与最近一次富余帧数，以及最近一秒的回滚 / 重推 / 追帧 / 停顿计数，以及 sim（本地预测推进）、net（确认输入 + 回滚重推 + 对账）、present（表现层）三段的平均 / 最大耗时，另记整场最坏值；一秒窗口内最长渲染帧超过 60 ms 时输出一条限频的英文卡顿日志，无逐帧日志。
 - 每 30 帧双方各自计算帧哈希对账（`BattleFrameHash`）；不一致时客户端发 `BattleResyncReq`，battle 下发 `BattleSnapshotPush`（世界快照 + 快照后确认帧）复位。
 - 传输暂走 TCP，经 gateway 按 msg_id 范围路由到 service_id 1 的 battle 实例。
 
