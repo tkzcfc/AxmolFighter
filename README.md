@@ -50,9 +50,10 @@ AxmolFighter/
 
 联机回滚由 `sim/rollback/RollbackSession` 提供（编译进客户端与战斗服，无引擎依赖）。会话持有 `World`、按固定深度 `kMaxRollbackFrames` 保存每帧快照，按槽位维护已确认/预测输入：本地槽位用 `addLocalInput` 提交预测，远端槽位缺失输入时重复该槽位最近一次确认输入；`addConfirmedInput` 接收服务器确认（乱序、重复幂等、冲突记错误），确认与已用预测不一致时回滚到最早不一致帧之前的快照并重推。预测帧数超过窗口深度时 `advanceTo/tick` 返回 false 停止推进（stall），避免快照被覆盖。`resync(frame, snapshot)` 采用服务器快照复位并丢弃旧历史。会话累计 `rollbacks/maxDepth/resimFrames/stalls/mispredictions` 统计，`mugen_sim_cli rollback-sim` 用模拟延迟驱动会话并打印统计。
 
-联机同步的服务器权威侧由 `sim/net/` 提供：`NetCodec` 用 `BinaryArchive` 将 `WorldSetup` / `PlayerInput` / `FrameInput` 编解码为确定性字节串（承载在 protobuf `bytes` 字段）；`LockstepAuthority` 持有唯一权威 `World`，按槽位接受输入（过期或超前 `kMaxInputLead`(90) 帧拒绝、同帧重复提交保持首次）、`step()` 推进下一帧并返回确认 `FrameInput`、每 `kHashInterval`(30) 帧记录确定性哈希、`outcome()` 返回 `BattleOutcome`、`serializeWorld` 产出重同步快照。`WorldSetup` 的玩家配置为 `std::vector<PlayerSetup> m_players`（`m_slot/m_roleId/m_class/m_level/m_camp/m_aiDifficulty/m_isAi`），`bootstrapBattle` 按该列表出生全部玩家并返回 `std::vector<Entity>`。缺帧输入在权威侧与客户端预测采用同一规则补空输入（攻击命令是边沿事件，只在按下那帧提交，因此补空不会丢招）。回放 `.mgrp` 格式 v4：`MGRP` 魔数 + 版本 4 + schemaHash + seed + `WorldSetup` + 连续帧输入。
+联机同步的服务器权威侧由 `sim/net/` 提供：`NetCodec` 用 `BinaryArchive` 将 `WorldSetup` / `PlayerInput` / `FrameInput` 编解码为确定性字节串（承载在 protobuf `bytes` 字段）；`LockstepAuthority` 持有唯一权威 `World`，按槽位接受输入（超前 `kMaxInputLead`(90) 帧拒绝、同帧重复提交保持首次；首次到达时目标帧已 tick 的迟到输入，非空命令且迟到不足 `kMaxLateCarryFrames`(12) 帧则顺延到下一帧执行、其余丢弃；`needsInput` 供调用方在解码前跳过重发，`inputStats` 给出迟到 / 顺延 / 丢弃累计与「到达富余帧数」窗口统计）、`step()` 推进下一帧并返回确认 `FrameInput`、每 `kHashInterval`(30) 帧记录确定性哈希、`outcome()` 返回 `BattleOutcome`、`serializeWorld` 产出重同步快照。`WorldSetup` 的玩家配置为 `std::vector<PlayerSetup> m_players`（`m_slot/m_roleId/m_class/m_level/m_camp/m_aiDifficulty/m_isAi`），`bootstrapBattle` 按该列表出生全部玩家并返回 `std::vector<Entity>`。缺帧输入在权威侧与客户端预测采用同一规则补空输入（攻击命令是边沿事件，只在按下那帧提交，因此补空不会丢招）。回放 `.mgrp` 格式 v4：`MGRP` 魔数 + 版本 4 + schemaHash + seed + `WorldSetup` + 连续帧输入。
 
 表现事件带稳定身份以便回滚去重：`PresentationEvent` 新增每帧从零重计的 `ordinal` 字段（`seq` 仍为全局单调，仅供追踪输出与离线去重）；`RollbackSession` 收集各帧事件，按「帧 + 实体 + ordinal + 载荷」哈希去重后经 `eventsToPresent()` 输出，重推产生的同帧同内容事件被跳过、误预测产生的新事件照常呈现（不撤销已播放事件）。表现层 `WorldPresenter` 新增 `presentEvents(events, …)` 消费会话去重后的显式列表（不再按 `seq` 单调去重），离线 `LocalBattleMode` 仍走原 `present(world, …)` 路径，行为不变。
+表现层显示节点复用与伤害飘字（`WorldPresenter`）：`AvatarPresenter` 按实体句柄逐帧比对外观身份（实体组 + 配置行 id + 是否绑定动作文件），回滚恢复快照后同一句柄指向另一个实体时回收并重建显示节点（同时丢弃该句柄的宠物与换装覆盖）。无时装的 Avatar / 无动作文件的 Spine 节点摘下后按外观键进入复用池（每键上限 8、合计上限 64，复位颜色/缩放后重放动作），`loadMap` 与表现层析构时清空；时装角色实例私有，不入池。`PresentationEvent` 的 `HurtNumber` 载荷携带 `m_critical`、`m_hasContact`、`m_contact`（命中接触点，屏幕平面），不进入追踪输出。伤害飘字用位图字体 `Content/mugen/font/hurt_{normal,hero,crit,word}.fnt`（共用图集 `hurt_number.png`，由参考战斗文字图集转出：玩家方伤害 / 敌方打玩家 / 暴击 / 未命中·闪避文字），`ax::Label::createWithBMFont` 按字体池化，按 50ms 步进播放 20 步（放大回落 → 停留 → 上升淡出），最多同时 64 条。新增 `Content` 资源后需重新 configure（`cmake -S AxmolFighter-Client -B AxmolFighter-Client/build`）才会进入 Xcode 产物。
 
 伙伴怒气职业（roleId=107）在 sim 侧新增 `PartnerRageState` 组件：施法管线开始记录首段技能 `rage`，首次命中结算一次怒气，怒气满后可通过怒气槽位 `P`（`CTR_ATKQ`）触发变身；变身状态同步到 `MotionState::m_partnerRageTransformed`，并通过 `PresentationEvent::PartnerRageChanged` 通知表现层。对应配置由 `partner` 表提供 `roleId/partnerType/typeValue`（`partnerType=1` 表示怒气变身伙伴，`typeValue` 为冻结毫秒）。
 
@@ -180,11 +181,17 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
 
 - battle 服以 30 Hz 墙钟固定 tick 推进共享的 mugen `sim::World`（`frame_ms`≈33），收集各槽位输入、确认后广播每帧输入（`BattleFramesPush`）。
 - 客户端本地预测推进；收到服务器确认后按帧对账，确认与预测不一致时回滚到最早不一致帧并重推（`sim/rollback/RollbackSession`，见「战斗核心」）。
-- 客户端在「估计服务器帧 + `input_delay_frames`（当前 4）」处提交输入；估计帧落后真实帧约一个单向时延，输入到达服务器时帧号必须仍大于已 tick 帧，因此单向时延需小于约 `input_delay_frames` 个逻辑帧，否则输入被判迟到并被补空；服务端对迟到输入用与客户端预测相同的规则替换（复用该槽位最近一次确认输入）。
+- **自适应输入领先量**：客户端在「估计服务器帧 + 输入领先量」处预测并提交输入。估计服务器帧由 `BattleFramesPush` 到达时刻校时得出，天然落后真实帧约一个单向时延 d，输入再花 d 才到服务器，所以输入到达时约领先服务器「领先量 − 2d」帧，领先量至少要覆盖一个 RTT 加抖动，否则输入会在目标帧被 tick 之后才到达（迟到）。固定 4 帧领先量只能容忍约 66 ms 单向时延，因此领先量改为闭环自适应，由 `BattleStartPush.input_delay_frames`（当前 4，`kInputDelayFrames`）给出初值。
+  - **服务器反馈**（`BattleFramesPush`，按接收方槽位个性化）：`input_slack_min/frame/samples` = 自上次推送以来该槽位首次到达的输入帧里最小的「到达富余帧数」（输入帧号 − 到达时已 tick 帧 − 1，负数为迟到）及对应帧号；`late_inputs` = 该槽位累计迟到帧数；`echo_client_time_ms` = 回显该槽位最近一条 `BattleInputPush.client_time_ms`（只回显一次），客户端用它测 RTT（含至多一个服务器 tick 的持有时间，略偏大）。`LockstepAuthority` 用每槽位已收帧号集合（回溯 `kReceivedWindowFrames`=64 帧）区分冗余重发与首次到达。
+  - **客户端控制律**（`NetBattleSync::onServerFeedback`，纯整数）：最小富余 < `m_slackTargetFrames`(2) 时立即按缺口增大（单次至多 `m_maxLeadStep`=8），上限 `min(m_maxLeadFrames=30, 回滚深度−16, kMaxInputLead−8)`；只有一个观察窗口（`m_shrinkWindowFrames`=30 帧）内最小富余始终 ≥ 目标 + `m_shrinkMarginFrames`(2) 才缩小，每窗口至少 1 帧、富余大时约缩富余的三分之一，且不低于 `ceil((srtt + 2·rttvar)/frame_ms)` 与 `m_minLeadFrames`(2)。领先量变化后，帧号早于生效帧的旧样本被忽略，避免途中数据造成连续超调。
+  - **不跳帧、不改写**：领先量只改变 `targetFrame`。增大时本地预测多追几帧（帧号连续）；缩小时 `targetFrame` 低于当前帧，`NetBattleMode::onUpdate` 自然等待。每个帧号只生成并发送一次输入（`RollbackSession::canAdvance` 在消费 `ControlManagerCore` 命令之前先判断预测窗口，被停顿的帧不会吞掉一次性命令）；冗余重发只会重发同一帧的同一内容。
+  - **迟到输入顺延而非丢弃**：迟到的非空输入（迟到 < `kMaxLateCarryFrames`=12 帧）并入下一个未 tick 帧、排在该帧自身命令之前，保持命令先后顺序；该帧确认输入广播后，发送方客户端把本地预测回滚为服务器结果（一次 `localMispredictions`），攻击 / `CTR_IDLE` 只是晚几帧生效而不会彻底丢失。迟到更久的丢弃（避免卡顿后很久才触发过期攻击）。`net_duel_sync_test` 在 20/60/120/200 ms 单向时延 + 抖动、以及 20→150 ms 突变与 200→20 ms 恢复下验证：收敛后服务器不再记录任何迟到输入、本地输入不被改写、同帧号输入内容唯一；领先量收敛到约「RTT（含抖动）帧数 + 2~3 帧」。
+- 预测规则：远端槽位（及本地槽位无本地输入的帧）预测空输入。`ControlManagerCore` 只在方向 / 按键变化时发令（`CTR_RUN` 仅在方向变化时发出，持续按住不重复），空输入在模拟里等价于「保持当前动作」，因此持续移动几乎不会错预测；只有边缘事件（对端点击攻击、改变方向）才错预测并触发回滚，每次回滚重推约「输入领先量 + 单向时延」帧（领先量自适应，20/60 ms 实测 5–8 帧，连点普攻约 2 次回滚/秒）。不要改成「重复最近一次非空输入」，那会把单次攻击事件重复触发。`RollbackStats` 把错误预测拆成 `localMispredictions`（本地输入被服务器改写，网络正常时应为 0）与 `remoteMispredictions`（对端边缘输入，预期内），`RollbackSession` 会丢弃已落出回滚窗口的输入历史并忽略窗口外的迟到确认。
+- 联网调试面板（`NetBattleMode::renderDebugPanel`）显示当前输入领先量（帧 / ms）、测得 RTT 与抖动、服务器累计迟到输入数与最近一次富余帧数，以及最近一秒的回滚 / 重推 / 追帧 / 停顿计数，以及 sim（本地预测推进）、net（确认输入 + 回滚重推 + 对账）、present（表现层）三段的平均 / 最大耗时，另记整场最坏值；一秒窗口内最长渲染帧超过 60 ms 时输出一条限频的英文卡顿日志，无逐帧日志。
 - 每 30 帧双方各自计算帧哈希对账（`BattleFrameHash`）；不一致时客户端发 `BattleResyncReq`，battle 下发 `BattleSnapshotPush`（世界快照 + 快照后确认帧）复位。
 - 传输暂走 TCP，经 gateway 按 msg_id 范围路由到 service_id 1 的 battle 实例。
 
-客户端联网决斗由 `AxmolFighter-Client/Source/ui/battle/NetBattleMode` 承载：进入后发 `BattleReadyReq`，收到 `BattleStartPush` 解码 `WorldSetup` 并交给 `sim/rollback/RollbackSession` 引导世界，按「估计服务器帧 + `input_delay_frames`」本地预测；`BattleInputPush` 回带冗余输入与客户端哈希，`BattleFramesPush` 确认输入并做哈希对账，不一致发 `BattleResyncReq`、收到 `BattleSnapshotPush` 复位。时钟同步与哈希/冗余/重同步决策集中在无引擎依赖的 `mugen::sim::net::NetBattleSync`，由 `TestsHeadless/tests/NetBattleSyncTest.cpp` 做无头回环测试。`RollbackSession::tick` 在服务器确认帧领先当前帧（客户端启动阻塞或卡顿后追帧）时仍继续推进，不做无符号减法；`AxmolFighter-Server/battle/tests/net_duel_sync_test.cpp` 用真实 `BattleRoom` + 两个 `NetBattleSync` 客户端、虚拟墙钟、时延与时钟域偏移做端到端回归。表现层外观：镜头跟随实体（本地玩家）使用本机会话时装；对端玩家使用 game 服在创建战斗时下发的外观（`BattlePlayerSpec.appearance` → `BattlePlayerInfo.appearance`，即 `TownAppearance`），`NetBattleMode` 在引导世界后用 `WorldPresenter::setEntityAppearance` / `setEntityPet` 覆盖对端槽位实体。`TownAppearance → FashionAppearance` 的转换集中在 `ui/progress/SessionFashionAppearance` 的 `fashionAppearanceFromTown`，由 `TownSync` 与 `NetBattleMode` 共用。外观只用于表现，不进入 `WorldSetup` / 模拟 / 哈希。
+客户端联网决斗由 `AxmolFighter-Client/Source/ui/battle/NetBattleMode` 承载：进入后发 `BattleReadyReq`，收到 `BattleStartPush` 解码 `WorldSetup` 并交给 `sim/rollback/RollbackSession` 引导世界，按「估计服务器帧 + 自适应输入领先量」本地预测；`BattleInputPush` 回带冗余输入、客户端哈希与发送时间戳，`BattleFramesPush` 确认输入、携带输入到达反馈并做哈希对账，不一致发 `BattleResyncReq`、收到 `BattleSnapshotPush` 复位。时钟同步与哈希/冗余/重同步决策集中在无引擎依赖的 `mugen::sim::net::NetBattleSync`，由 `TestsHeadless/tests/NetBattleSyncTest.cpp` 做无头回环测试。`RollbackSession::tick` 在服务器确认帧领先当前帧（客户端启动阻塞或卡顿后追帧）时仍继续推进，不做无符号减法；`AxmolFighter-Server/battle/tests/net_duel_sync_test.cpp` 用真实 `BattleRoom` + 两个 `NetBattleSync` 客户端、虚拟墙钟、时延与时钟域偏移做端到端回归。表现层外观：镜头跟随实体（本地玩家）使用本机会话时装；对端玩家使用 game 服在创建战斗时下发的外观（`BattlePlayerSpec.appearance` → `BattlePlayerInfo.appearance`，即 `TownAppearance`），`NetBattleMode` 在引导世界后用 `WorldPresenter::setEntityAppearance` / `setEntityPet` 覆盖对端槽位实体。`TownAppearance → FashionAppearance` 的转换集中在 `ui/progress/SessionFashionAppearance` 的 `fashionAppearanceFromTown`，由 `TownSync` 与 `NetBattleMode` 共用。外观只用于表现，不进入 `WorldSetup` / 模拟 / 哈希。
 
 ### 消息一览
 
@@ -198,11 +205,11 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
 | 20015 | battle→C | `BattleSnapshotPush` | 世界快照（帧号 + `server_time_ms`）+ 快照后确认帧；重同步与断线重连共用 |
 | 20016 | battle→C | `BattleEndPush` | 战斗结束结果（胜者阵营/原因/玩家结果） |
 | 20017 | C→battle | `BattleLeaveReq` | 投降（仅玩家显式点击投降发送；关闭客户端 / 断线 / 切屏不发） |
-| 1411 | game→C | `DuelStartPush` | 决斗成立，客户端切换到联网战斗界面并发 `BattleReadyReq` |
+| 1411 | game→C | `DuelStartPush` | 决斗成立（`battle_id`/`room_id`/对手信息/`class_ids`：全部参战者职业 id，按槽位升序，供客户端预加载技能特效），客户端切换到联网战斗界面并发 `BattleReadyReq` |
 | 60000/60001 | game↔battle | `BattleCreateReq/Resp` | 创建战斗（房间/种子/pvp/玩家描述） |
 | 60002 | battle→game | `BattleResultReq` | 战斗结果上报（单向推送，game 据此清理绑定与玩家战斗记录） |
 | 60003/60004 | game↔battle | `BattleRejoinReq/Resp` | 断线重连：game 把玩家的新 session 改绑到进行中战斗的槽位（RPC；Resp.code 0 成功 / 1 战斗不存在 / 2 已结束 / 3 玩家不在其中） |
-| 1205 | game→C | `SelectCharacterResp.rejoin`（`BattleRejoinInfo{battle_id, room_id}`） | 账号有进行中的战斗时下发，客户端不进城镇而直接进入战斗界面 |
+| 1205 | game→C | `SelectCharacterResp.rejoin`（`BattleRejoinInfo{battle_id, room_id, class_ids}`） | 账号有进行中的战斗时下发，客户端不进城镇而直接进入战斗界面 |
 
 关键类型在 `game_types.proto`（PB.Types）：`BattlePlayerSpec`（`session_id`/`player_id`/`character_id`/`name`/`class_id`/`slot`/`camp`/`level`/`appearance`；`appearance` 由 game 服用 `town_appearance_from_character` 从角色构造，与城镇外观同一份）、`BattlePlayerResult`（`player_id`/`slot`/`camp`/`win`）。
 
@@ -242,15 +249,15 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
 - 重连宽限 `reconnect_grace_seconds`（`battle.toml` 的 `[server]`，默认 60）。宽限耗尽仍未回来才判负 `Disconnect`，对手获胜。重连成功清零计时。
 - 对手不收专门通知；断线者角色停下即可见。战斗在断线期间结束（KO/超时/对手投降/宽限耗尽）时，game 已按 `BattleResultReq` 清掉玩家记录，再次登录正常进城镇。
 
-**game 服**：`GameShared.player_battles`（`player_id → ActivePlayerBattle{battle_id, battle_instance_id, room_id, character_id}`）独立于 session：`start_duel_battle` 成功后写入；`BattleResultReq` / battle 实例下线时清除；session 断开（`clear_session_runtime_state`）**不清**。`handle_select_character` 里 `resolve_select_character`：账号有进行中的战斗则强制选回参战角色并执行重连，否则按请求选角：
+**game 服**：`GameShared.player_battles`（`player_id → ActivePlayerBattle{battle_id, battle_instance_id, room_id, character_id, class_ids}`）独立于 session：`start_duel_battle` 成功后写入；`BattleResultReq` / battle 实例下线时清除；session 断开（`clear_session_runtime_state`）**不清**。`handle_select_character` 里 `resolve_select_character`：账号有进行中的战斗则强制选回参战角色并执行重连，否则按请求选角：
 
 1. gateway `BindServiceReq` 把新 session 绑到该 battle 实例；
 2. RPC `BattleRejoinReq{battle_id, player_id, session_id}`（60003）通知 battle 改绑槽位；失败则回滚绑定。code≠0（战斗不存在 / 已结束 / 玩家不在其中）视为记录过期，丢弃后按普通选角进城镇；gateway/battle 暂不可用则本次进城镇、记录保留；
-3. `bind_battle_session` 记录新 session，`SelectCharacterResp.rejoin = BattleRejoinInfo{battle_id, room_id}`。
+3. `bind_battle_session` 记录新 session，`SelectCharacterResp.rejoin = BattleRejoinInfo{battle_id, room_id, class_ids}`（`class_ids` 取自开局时存入 `ActivePlayerBattle` 的参战者职业）。
 
 **battle 服**：`BattleRoomManager::rejoin` → `BattleRoom::rejoin(player_id, new_session)` 改绑槽位、清断线计时、标记 `startSent=false`，并更新 session→房间路由（旧 session 之后迟到的离线通知不再影响该槽位）。此刻**不推送**：客户端还停在选角界面，没有注册监听，推送会丢。客户端进入战斗界面发 `BattleReadyReq` 后，房间在 `Running` 状态下对 `startSent=false` 的槽位补发 `BattleStartPush{resume=true}`（同一份 setup、`local_slot`、玩家列表与外观），紧接着发 `BattleSnapshotPush{frame=当前帧, world, server_time_ms}`。同一机制也让开局超时后才入座的迟到槽位同步进当前帧。未同步的槽位不接收 `BattleFramesPush`。
 
-**客户端**：`CharacterLobbyScreen` 收到 `rejoin` 直接 `switchScreen<GameScreen>(NetBattleParams{battle_id, room_id})`。`NetBattleMode` 收到 `resume=true` 的开始参数后只引导帧 0 的世界并置 `m_awaitSnapshot`：此期间不推进、不对账、不开 HUD；快照到达后 `NetBattleSync::resync` 复位到当前帧，并用快照的 `server_time_ms` 调 `resetClock` 直接对齐时钟（估计服务器帧立即落在快照帧附近，目标帧 = 服务器帧 + 输入延迟），之后沿用既有预测/对账路径，绝不从帧 0 重新模拟。
+**客户端**：`CharacterLobbyScreen` 收到 `rejoin` 直接 `switchScreen<GameScreen>(NetBattleParams{battle_id, room_id, roleIds})`（`roleIds` 由 `class_ids` 经 `toRoleConfigId` 转换；`DuelStartPush` 同理）。`GameScreen::onPrepareLoad` 在联网模式下对每个 `roleIds` 调 `gameres::addRoleEffects`，与本地副本一样预加载技能特效 Spine。`NetBattleMode` 收到 `resume=true` 的开始参数后只引导帧 0 的世界并置 `m_awaitSnapshot`：此期间不推进、不对账、不开 HUD；快照到达后 `NetBattleSync::resync` 复位到当前帧，并用快照的 `server_time_ms` 调 `resetClock` 直接对齐时钟（估计服务器帧立即落在快照帧附近，目标帧 = 服务器帧 + 输入领先量），之后沿用既有预测/对账路径，绝不从帧 0 重新模拟。
 
 ### 结束原因（reason）
 
