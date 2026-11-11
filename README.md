@@ -41,7 +41,7 @@ AxmolFighter/
 | `core/` | 数学、反射、序列化、ECS、行为树内核。不依赖引擎 |
 | `conf/` | 配置结构体、`Config` 加载、职业 id 换算（`TypeConversions`） |
 | `avatar/` | 角色表现：逻辑侧（`MotionPlayer`、外观解析、`AvatarPaths`）在根目录，渲染侧在 `avatar/render/` |
-| `render/` | 仅客户端：Spine 后端、`LayerRuntimeLoader`、`VirtualCamera` |
+| `render/` | 仅客户端：Spine 后端、`LayerRuntimeLoader`、`VirtualCamera`；战斗表现在 `render/battle/`（`WorldPresenter` 与 `AvatarPresenter`/`MapPresenter`/`CameraDirector`/`SoundPlayer`/`HurtNumber`/`DebugDraw` 各一对 `.h/.cpp`）。角色/特效/宠物挂地图 `.layer` 的 entity 层，飘字与调试框在随镜头平移的顶层 overlay |
 | `sim_legacy/` | 现行战斗逻辑（已冻结为旧实现，命名空间 `mugen::sim_legacy`；新的 ECS 实现见 `AxmolFighter-Client/Source/mugen/DESIGN.md`）：`World` tick 管线、ECS 组件/单例登记、帧输入与表现事件、`.mgrp` 回放与 `mugen_legacy_cli`；`ability/` 是组件化特殊能力池，按技能、命中、Buff 和角色生命周期事件稳定分派 | 
 | `sim/` | 新的 ECS 战斗实现（命名空间 `mugen::sim`，设计见 `DESIGN.md`，按切片 S0–S8 推进）：`Schedule.h` 的 `kSchedule` 是唯一帧调度表，系统为 `XxxSystem.cpp` 中的 `void runXxx(World&)`，系统间只通过组件与 `EventQueue` 单例通信。目前完成 S0 骨架、S1（B1–B3）与 S2 Buff 引擎：出生/房间进入、位移与地图钳制、技能簿与时间轴（含取消窗口连招）、碰撞与命中微管线（伤害公式、顿帧、受击/受击恢复/死亡状态机）、KO 慢放、Buff op 解释器（`sim/buff/`：`BuffComponents.h` 持 `BuffList`/`AbilityList`；`BuffRules.h/.cpp` 准入/移除/触发/周期；`BuffEval.cpp` 求值 `ValueExpr`/`Predicate`；`BuffOps.cpp` 执行 op；`BuffInternal.h` 解释器内部状态；`BuffTickSystem` 在 P2 推进，顿帧期间 buff tick 继续，DESIGN §3.4）、DebugSink 追踪行导出效果摘要。片段 Buff 仍在进入准入、退出移除。系统文件头固定写读/写/消费/产生四行；规则库在 `mugen::sim::<域>::rules`；事实/请求事件只经 `EventQueue` 单例传递，系统之间不互相调用。已通过摘要比对的场景：`class1_move`、`class1_a_dummy`、`class1_superarmor`（min/max）以及 `buff_*.script`（覆盖表 `buff_coverage.txt`）；`buff_spawn` 当前不过，属 S3 受击状态机待修。其余场景留给后续切片。尚未接入客户端与战斗服 |
 
@@ -318,7 +318,7 @@ powershell -File AxmolFighter-Tools/config_converter/run_config_converter.ps1 --
 - 帧动画（纸娃娃）资源的接入方式：离线转换为 spine（每部位一个 slot，attachment 时间轴 + drawOrder；每个部位的区域名一致的 atlas），直接复用 atlas 换装；`AniData`/`MotionEntryType::kAni` 仅保留数据类型，运行时不使用。
 - Spine 数据归属在创建时确定（`MgSkeletonData::isExclusive`），不从 `use_count` 推断；共享缓存 key 为骨架 + 规范化 atlas 列表 + scale，切换 View 后 `purgeUnused`：删掉仅被缓存持有的骨架，并对 atlas 页在 `TextureCache` 只剩自身引用时 `removeTextureForKey`（不调用全量 `removeUnusedTextures`）。
 - 逻辑文件放 `mugen/avatar/` 根目录（禁止 include axmol/spine）；渲染文件放 `render/` 并整体 `#ifdef RUNTIME_IN_AXMOL`（battle CMake 自动排除）。
-- 状态机经 `AvatarComponent::play` 驱动 `MotionPlayer`；渲染 `Avatar` 由 `AvatarPresenter` 跟随（动作变化时 setMotion + seek，漂移超过阈值时 seek 校正）。`MotionState` 是可序列化的播放标量，包含 `.motion` 路径、播放位置和速度。
+- 状态机经 `AvatarComponent::play` 驱动 `MotionPlayer`；渲染 `Avatar` 由 `AvatarPresenter` 跟随：每帧 `advance(renderDelta×播放速度)`，仅动作/clip 切换、首次显示、换装、显示时间与 sim `motion.timeMs` 偏差超过 1 逻辑帧时 `seek`。`MotionState` 是可序列化的播放标量，包含 `.motion` 路径、播放位置和速度。
 
 ## 资源加载器（Source/resource, 命名空间 gameres）
 
