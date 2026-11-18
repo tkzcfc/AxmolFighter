@@ -22,8 +22,8 @@ The Axmol engine is not in the repo. It needs `AX_ROOT` and the `axmol` CLI from
 - The project is unreleased. **Do not add compatibility layers or shims**; you may change interfaces.
 - Comments may be in Chinese. **Log and error strings must be in English.**
 - In comments under `Client/Source/**` and `Server/**`, never name the reference product (Chinese name, pinyin or English name). Also never cite `E:\...` paths or planning-doc paths. Describe what the code means instead.
-- Don't add defensive null checks. `BTContext.entity` is always valid, and results after `ensureXxx` are never null. The one exception is `MG_GET_COMPONENT`, whose result can be null.
-- C++ members use the `m_` prefix. Rust uses snake_case / CamelCase.
+- Don't add defensive null checks. Results after ensureXxx are never null; `ECSManager::tryGet<T>()` (or `MG_GET_COMPONENT`) can return null.
+- C++ `class` non-public data members use the `m_` prefix; `struct` fields use bare `camelCase` names without `m_`. Restrict `struct` to public data aggregates (ECS components/singletons/events/views, config/IO records, value types, with at most lightweight helpers); types encapsulating private state, invariants, or resource lifecycles must be `class`. Rust uses `snake_case` / `CamelCase`.
 
 ## Porting from heiyue
 - Before porting, read the `Reference/heiyue-*.md` docs first, then only the specific `.lua` files they cite (`path:line`). **Don't bulk-scan `heiyue/src`.** Lua sources are UTF-8.
